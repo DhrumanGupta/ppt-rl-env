@@ -1,95 +1,32 @@
 import sys
 from pathlib import Path
 
-from pptx.dml.color import RGBColor
-from pptx.enum.shapes import MSO_AUTO_SHAPE_TYPE
-from pptx.util import Inches
-
 
 ROOT = Path(__file__).resolve().parents[2]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from src.tools.pptx_tools import PptxEditor
-
+from src.tools.pptx_tools import (
+    add_blank_slide,
+    add_chart_block,
+    add_citation_block,
+    add_table_block,
+    add_text_block,
+    create_presentation,
+    get_theme_preset,
+    save_presentation,
+)
 
 OUTPUT_DIR = ROOT / "outputs" / "test_slides"
 
 
-def rgb(hex_color: str) -> RGBColor:
-    return RGBColor.from_string(hex_color.replace("#", ""))
-
-
-def apply_slide_background(slide, color_hex: str):
-    fill = slide.background.fill
-    fill.solid()
-    fill.fore_color.rgb = rgb(color_hex)
-
-
-def add_accent_bar(slide, color_hex: str):
-    accent = slide.shapes.add_shape(
-        MSO_AUTO_SHAPE_TYPE.RECTANGLE,
-        Inches(0),
-        Inches(0),
-        Inches(13.33),
-        Inches(0.35),
-    )
-    accent.fill.solid()
-    accent.fill.fore_color.rgb = rgb(color_hex)
-    accent.line.fill.background()
-
-
-def add_textbox(
-    editor: PptxEditor, slide_index: int, x: float, y: float, w: float, h: float
-) -> int:
-    slide = editor.prs.slides[slide_index]
-    slide.shapes.add_textbox(Inches(x), Inches(y), Inches(w), Inches(h))
-    return len(slide.shapes) - 1
-
-
-def add_text_block(
-    editor: PptxEditor,
-    slide_index: int,
-    text: str,
-    x: float,
-    y: float,
-    w: float,
-    h: float,
-    *,
-    font_name: str,
-    font_size: int,
-    color_hex: str,
-    bold: bool = False,
-    italic: bool = False,
-) -> int:
-    shape_index = add_textbox(editor, slide_index, x, y, w, h)
-    editor.insert_text(slide_index, shape_index, text)
-    editor.style_update(
-        slide_index,
-        shape_index,
-        font_name=font_name,
-        font_size_pt=font_size,
-        bold=bold,
-        italic=italic,
-        color_hex=color_hex,
-    )
-    return shape_index
-
-
 def build_modern_business_deck(output_path: Path):
-    editor = PptxEditor()
-    theme = {
-        "bg": "#F6F9FC",
-        "accent": "#0F62FE",
-        "primary": "#102A43",
-        "secondary": "#486581",
-        "font": "Aptos",
-    }
+    editor = create_presentation()
+    theme = get_theme_preset("modern_business")
 
-    slide_index = editor.add_slide(6)
-    slide = editor.prs.slides[slide_index]
-    apply_slide_background(slide, theme["bg"])
-    add_accent_bar(slide, theme["accent"])
+    slide_index = add_blank_slide(
+        editor, background_color=theme["bg"], accent_color=theme["accent"]
+    )
     add_text_block(
         editor,
         slide_index,
@@ -116,10 +53,9 @@ def build_modern_business_deck(output_path: Path):
         color_hex=theme["secondary"],
     )
 
-    slide_index = editor.add_slide(6)
-    slide = editor.prs.slides[slide_index]
-    apply_slide_background(slide, "#FFFFFF")
-    add_accent_bar(slide, theme["accent"])
+    slide_index = add_blank_slide(
+        editor, background_color=theme["surface"], accent_color=theme["accent"]
+    )
     add_text_block(
         editor,
         slide_index,
@@ -145,12 +81,17 @@ def build_modern_business_deck(output_path: Path):
         font_size=18,
         color_hex=theme["secondary"],
     )
-    editor.add_citation(slide_index, "Source: Internal planning memo, Q1 2026")
+    add_citation_block(
+        editor,
+        slide_index,
+        "Source: Internal planning memo, Q1 2026",
+        font_name=theme["font"],
+        color_hex=theme["secondary"],
+    )
 
-    slide_index = editor.add_slide(6)
-    slide = editor.prs.slides[slide_index]
-    apply_slide_background(slide, "#FFFFFF")
-    add_accent_bar(slide, theme["accent"])
+    slide_index = add_blank_slide(
+        editor, background_color=theme["surface"], accent_color=theme["accent"]
+    )
     add_text_block(
         editor,
         slide_index,
@@ -164,7 +105,8 @@ def build_modern_business_deck(output_path: Path):
         color_hex=theme["primary"],
         bold=True,
     )
-    editor.add_chart(
+    add_chart_block(
+        editor,
         slide_index,
         "column_clustered",
         {
@@ -206,10 +148,9 @@ def build_modern_business_deck(output_path: Path):
         color_hex=theme["secondary"],
     )
 
-    slide_index = editor.add_slide(6)
-    slide = editor.prs.slides[slide_index]
-    apply_slide_background(slide, "#FFFFFF")
-    add_accent_bar(slide, theme["accent"])
+    slide_index = add_blank_slide(
+        editor, background_color=theme["surface"], accent_color=theme["accent"]
+    )
     add_text_block(
         editor,
         slide_index,
@@ -223,10 +164,9 @@ def build_modern_business_deck(output_path: Path):
         color_hex=theme["primary"],
         bold=True,
     )
-    editor.add_table(
+    add_table_block(
+        editor,
         slide_index,
-        4,
-        3,
         [
             ["Initiative", "Owner", "Impact"],
             ["Pricing refresh", "Revenue Ops", "+6% ARR"],
@@ -249,25 +189,16 @@ def build_modern_business_deck(output_path: Path):
         },
     )
 
-    output_path.parent.mkdir(parents=True, exist_ok=True)
-    editor.prs.save(output_path)
+    save_presentation(editor, str(output_path))
 
 
 def build_dark_analytics_deck(output_path: Path):
-    editor = PptxEditor()
-    theme = {
-        "bg": "#0B1020",
-        "surface": "#131A2A",
-        "accent": "#4FD1C5",
-        "primary": "#F7FAFC",
-        "secondary": "#A0AEC0",
-        "font": "Aptos Display",
-    }
+    editor = create_presentation()
+    theme = get_theme_preset("dark_analytics")
 
-    slide_index = editor.add_slide(6)
-    slide = editor.prs.slides[slide_index]
-    apply_slide_background(slide, theme["bg"])
-    add_accent_bar(slide, theme["accent"])
+    slide_index = add_blank_slide(
+        editor, background_color=theme["bg"], accent_color=theme["accent"]
+    )
     add_text_block(
         editor,
         slide_index,
@@ -294,10 +225,9 @@ def build_dark_analytics_deck(output_path: Path):
         color_hex=theme["secondary"],
     )
 
-    slide_index = editor.add_slide(6)
-    slide = editor.prs.slides[slide_index]
-    apply_slide_background(slide, theme["surface"])
-    add_accent_bar(slide, theme["accent"])
+    slide_index = add_blank_slide(
+        editor, background_color=theme["surface"], accent_color=theme["accent"]
+    )
     add_text_block(
         editor,
         slide_index,
@@ -324,10 +254,9 @@ def build_dark_analytics_deck(output_path: Path):
         color_hex=theme["secondary"],
     )
 
-    slide_index = editor.add_slide(6)
-    slide = editor.prs.slides[slide_index]
-    apply_slide_background(slide, theme["surface"])
-    add_accent_bar(slide, theme["accent"])
+    slide_index = add_blank_slide(
+        editor, background_color=theme["surface"], accent_color=theme["accent"]
+    )
     add_text_block(
         editor,
         slide_index,
@@ -341,7 +270,8 @@ def build_dark_analytics_deck(output_path: Path):
         color_hex=theme["primary"],
         bold=True,
     )
-    editor.add_chart(
+    add_chart_block(
+        editor,
         slide_index,
         "line_markers",
         {
@@ -383,10 +313,9 @@ def build_dark_analytics_deck(output_path: Path):
         color_hex=theme["secondary"],
     )
 
-    slide_index = editor.add_slide(6)
-    slide = editor.prs.slides[slide_index]
-    apply_slide_background(slide, theme["surface"])
-    add_accent_bar(slide, theme["accent"])
+    slide_index = add_blank_slide(
+        editor, background_color=theme["surface"], accent_color=theme["accent"]
+    )
     add_text_block(
         editor,
         slide_index,
@@ -400,10 +329,9 @@ def build_dark_analytics_deck(output_path: Path):
         color_hex=theme["primary"],
         bold=True,
     )
-    editor.add_table(
+    add_table_block(
+        editor,
         slide_index,
-        4,
-        3,
         [
             ["Region", "Utilization", "Headroom"],
             ["US-East", "68%", "High"],
@@ -425,26 +353,24 @@ def build_dark_analytics_deck(output_path: Path):
             "body_font_color_hex": theme["primary"],
         },
     )
-    editor.add_citation(slide_index, "Source: Weekly reliability metrics")
+    add_citation_block(
+        editor,
+        slide_index,
+        "Source: Weekly reliability metrics",
+        font_name=theme["font"],
+        color_hex=theme["secondary"],
+    )
 
-    output_path.parent.mkdir(parents=True, exist_ok=True)
-    editor.prs.save(output_path)
+    save_presentation(editor, str(output_path))
 
 
 def build_academic_report_deck(output_path: Path):
-    editor = PptxEditor()
-    theme = {
-        "bg": "#F8F5EF",
-        "accent": "#7A5C3E",
-        "primary": "#2D241D",
-        "secondary": "#6B5B4D",
-        "font": "Georgia",
-    }
+    editor = create_presentation()
+    theme = get_theme_preset("academic_report")
 
-    slide_index = editor.add_slide(6)
-    slide = editor.prs.slides[slide_index]
-    apply_slide_background(slide, theme["bg"])
-    add_accent_bar(slide, theme["accent"])
+    slide_index = add_blank_slide(
+        editor, background_color=theme["bg"], accent_color=theme["accent"]
+    )
     add_text_block(
         editor,
         slide_index,
@@ -472,10 +398,9 @@ def build_academic_report_deck(output_path: Path):
         italic=True,
     )
 
-    slide_index = editor.add_slide(6)
-    slide = editor.prs.slides[slide_index]
-    apply_slide_background(slide, "#FFFDF9")
-    add_accent_bar(slide, theme["accent"])
+    slide_index = add_blank_slide(
+        editor, background_color=theme["surface"], accent_color=theme["accent"]
+    )
     add_text_block(
         editor,
         slide_index,
@@ -502,10 +427,9 @@ def build_academic_report_deck(output_path: Path):
         color_hex=theme["secondary"],
     )
 
-    slide_index = editor.add_slide(6)
-    slide = editor.prs.slides[slide_index]
-    apply_slide_background(slide, "#FFFDF9")
-    add_accent_bar(slide, theme["accent"])
+    slide_index = add_blank_slide(
+        editor, background_color=theme["surface"], accent_color=theme["accent"]
+    )
     add_text_block(
         editor,
         slide_index,
@@ -519,7 +443,8 @@ def build_academic_report_deck(output_path: Path):
         color_hex=theme["primary"],
         bold=True,
     )
-    editor.add_chart(
+    add_chart_block(
+        editor,
         slide_index,
         "bar_clustered",
         {
@@ -561,10 +486,9 @@ def build_academic_report_deck(output_path: Path):
         color_hex=theme["secondary"],
     )
 
-    slide_index = editor.add_slide(6)
-    slide = editor.prs.slides[slide_index]
-    apply_slide_background(slide, "#FFFDF9")
-    add_accent_bar(slide, theme["accent"])
+    slide_index = add_blank_slide(
+        editor, background_color=theme["surface"], accent_color=theme["accent"]
+    )
     add_text_block(
         editor,
         slide_index,
@@ -578,10 +502,9 @@ def build_academic_report_deck(output_path: Path):
         color_hex=theme["primary"],
         bold=True,
     )
-    editor.add_table(
+    add_table_block(
+        editor,
         slide_index,
-        4,
-        3,
         [
             ["District", "Sites", "Avg canopy"],
             ["North", "18", "32%"],
@@ -603,10 +526,15 @@ def build_academic_report_deck(output_path: Path):
             "body_font_color_hex": theme["primary"],
         },
     )
-    editor.add_citation(slide_index, "Source: Urban Ecology Lab, field survey dataset")
+    add_citation_block(
+        editor,
+        slide_index,
+        "Source: Urban Ecology Lab, field survey dataset",
+        font_name=theme["font"],
+        color_hex=theme["secondary"],
+    )
 
-    output_path.parent.mkdir(parents=True, exist_ok=True)
-    editor.prs.save(output_path)
+    save_presentation(editor, str(output_path))
 
 
 def main():
