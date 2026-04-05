@@ -1,239 +1,473 @@
-from pathlib import Path
 from typing import Any, Dict, Optional
 
-from pptx.dml.color import RGBColor
-from pptx.enum.shapes import MSO_AUTO_SHAPE_TYPE
 from pptx.util import Inches
 
 from src.utils.pptx_functions import PptxEditor
 
 
-def rgb(hex_color: str) -> RGBColor:
-    return RGBColor.from_string(hex_color.replace("#", ""))
+_SHAPE_ID_UNSET = object()
 
 
-def create_presentation(path: Optional[str] = None) -> PptxEditor:
-    return PptxEditor(path)
+def register_theme(
+    editor: PptxEditor, theme: Dict[str, Any], name: str = "default"
+) -> str:
+    return editor.register_theme(name, theme)
 
 
-def save_presentation(editor: PptxEditor, output_path: str) -> str:
-    output = Path(output_path)
-    output.parent.mkdir(parents=True, exist_ok=True)
-    editor.prs.save(output)
-    return str(output)
-
-
-def get_theme_preset(name: str) -> Dict[str, str]:
-    presets = {
-        "modern_business": {
-            "bg": "#F6F9FC",
-            "surface": "#FFFFFF",
-            "accent": "#0F62FE",
-            "primary": "#102A43",
-            "secondary": "#486581",
-            "font": "Aptos",
-        },
-        "dark_analytics": {
-            "bg": "#0B1020",
-            "surface": "#131A2A",
-            "accent": "#4FD1C5",
-            "primary": "#F7FAFC",
-            "secondary": "#A0AEC0",
-            "font": "Aptos Display",
-        },
-        "academic_report": {
-            "bg": "#F8F5EF",
-            "surface": "#FFFDF9",
-            "accent": "#7A5C3E",
-            "primary": "#2D241D",
-            "secondary": "#6B5B4D",
-            "font": "Georgia",
-        },
-    }
-    if name not in presets:
-        raise ValueError(f"Unknown theme preset: {name}")
-    return dict(presets[name])
-
-
-def apply_slide_background(
-    editor: PptxEditor, slide_index: int, color_hex: str
+def update_theme(
+    editor: PptxEditor, updates: Dict[str, Any], name: str = "default"
 ) -> None:
-    editor._validate_slide(slide_index)
-    slide = editor.prs.slides[slide_index]
-    fill = slide.background.fill
-    fill.solid()
-    fill.fore_color.rgb = rgb(color_hex)
+    editor.update_theme(name, updates)
 
 
-def add_accent_bar(
+def _remove_bindings(
     editor: PptxEditor,
-    slide_index: int,
-    color_hex: str,
     *,
-    height: float = 0.35,
-) -> int:
-    editor._validate_slide(slide_index)
-    slide = editor.prs.slides[slide_index]
-    accent = slide.shapes.add_shape(
-        MSO_AUTO_SHAPE_TYPE.RECTANGLE,
-        Inches(0),
-        Inches(0),
-        Inches(13.33),
-        Inches(height),
-    )
-    accent.fill.solid()
-    accent.fill.fore_color.rgb = rgb(color_hex)
-    accent.line.fill.background()
-    return len(slide.shapes) - 1
-
-
-def apply_slide_theme(
-    editor: PptxEditor,
-    slide_index: int,
-    *,
-    background_color: Optional[str] = None,
-    accent_color: Optional[str] = None,
+    slide_id: Optional[int] = None,
+    shape_id: Any = _SHAPE_ID_UNSET,
+    apply_method: Optional[str] = None,
+    theme_name: Optional[str] = None,
 ) -> None:
-    if background_color is not None:
-        apply_slide_background(editor, slide_index, background_color)
-    if accent_color is not None:
-        add_accent_bar(editor, slide_index, accent_color)
-
-
-def add_blank_slide(
-    editor: PptxEditor,
-    *,
-    background_color: Optional[str] = None,
-    accent_color: Optional[str] = None,
-    layout_index: int = 6,
-) -> int:
-    slide_index = editor.add_slide(layout_index)
-    apply_slide_theme(
-        editor,
-        slide_index,
-        background_color=background_color,
-        accent_color=accent_color,
+    theme_names = (
+        [theme_name] if theme_name is not None else list(editor._theme_bindings)
     )
-    return slide_index
+
+    for current_theme_name in theme_names:
+        remaining = []
+        for binding in editor._theme_bindings.get(current_theme_name, []):
+            if slide_id is not None and binding.slide_id != slide_id:
+                remaining.append(binding)
+                continue
+            if shape_id is not _SHAPE_ID_UNSET and binding.shape_id != shape_id:
+                remaining.append(binding)
+                continue
+            if apply_method is not None and binding.apply_method != apply_method:
+                remaining.append(binding)
+                continue
+        editor._theme_bindings[current_theme_name] = remaining
 
 
-def add_textbox(
-    editor: PptxEditor, slide_index: int, x: float, y: float, w: float, h: float
+def _get_required(spec: Dict[str, Any], key: str) -> Any:
+    if key not in spec:
+        raise ValueError(f"Shape spec missing required field '{key}'")
+    return spec[key]
+
+
+def _get_optional_geometry(spec: Dict[str, Any]) -> Dict[str, float]:
+    geometry = {}
+    for source_key, target_key in (
+        ("x", "left"),
+        ("y", "top"),
+        ("w", "width"),
+        ("h", "height"),
+    ):
+        if source_key in spec:
+            geometry[target_key] = spec[source_key]
+    return geometry
+
+
+def _apply_geometry_updates(
+    editor: PptxEditor, slide_id: int, shape_id: int, spec: Dict[str, Any]
+) -> None:
+    geometry = _get_optional_geometry(spec)
+    if not geometry:
+        return
+
+    shape = editor._get_shape_by_id(slide_id, shape_id)
+    if "left" in geometry:
+        shape.left = Inches(geometry["left"])
+    if "top" in geometry:
+        shape.top = Inches(geometry["top"])
+    if "width" in geometry:
+        shape.width = Inches(geometry["width"])
+    if "height" in geometry:
+        shape.height = Inches(geometry["height"])
+
+
+def _record_named_shape(
+    result: Dict[str, Any], spec: Dict[str, Any], shape_id: int
+) -> None:
+    name = spec.get("name")
+    if name is None:
+        return
+    if name in result["named_shapes"]:
+        raise ValueError(f"Duplicate shape name '{name}' in one tool call")
+    result["named_shapes"][name] = shape_id
+
+
+def _create_accent_bar(
+    editor: PptxEditor, slide_id: int, spec: Dict[str, Any], theme_name: str
 ) -> int:
-    editor._validate_slide(slide_index)
-    slide = editor.prs.slides[slide_index]
-    slide.shapes.add_textbox(Inches(x), Inches(y), Inches(w), Inches(h))
-    return len(slide.shapes) - 1
-
-
-def add_text_block(
-    editor: PptxEditor,
-    slide_index: int,
-    text: str,
-    x: float,
-    y: float,
-    w: float,
-    h: float,
-    *,
-    font_name: str,
-    font_size: int,
-    color_hex: str,
-    bold: bool = False,
-    italic: bool = False,
-) -> int:
-    shape_index = add_textbox(editor, slide_index, x, y, w, h)
-    editor.insert_text(slide_index, shape_index, text)
-    editor.style_update(
-        slide_index,
-        shape_index,
-        font_name=font_name,
-        font_size_pt=font_size,
-        bold=bold,
-        italic=italic,
-        color_hex=color_hex,
+    return editor.add_accent_bar_by_id(
+        slide_id,
+        _get_required(spec, "color_hex"),
+        height=spec.get("height", 0.35),
+        theme_name=theme_name,
+        bind_theme=True,
     )
-    return shape_index
 
 
-def add_chart_block(
-    editor: PptxEditor,
-    slide_index: int,
-    chart_type: str,
-    chart_data: Dict[str, Any],
-    x: float,
-    y: float,
-    w: float,
-    h: float,
-    *,
-    style: Optional[Dict[str, Any]] = None,
+def _create_text(
+    editor: PptxEditor, slide_id: int, spec: Dict[str, Any], theme_name: str
 ) -> int:
-    editor._validate_slide(slide_index)
-    slide = editor.prs.slides[slide_index]
-    editor.add_chart(slide_index, chart_type, chart_data, x, y, w, h, style=style)
-    return len(slide.shapes) - 1
+    shape_id = editor.add_textbox_by_id(
+        slide_id,
+        _get_required(spec, "x"),
+        _get_required(spec, "y"),
+        _get_required(spec, "w"),
+        _get_required(spec, "h"),
+    )
+    editor.insert_text_by_id(slide_id, shape_id, _get_required(spec, "text"))
+    if spec.get("style"):
+        editor.style_text_by_id(
+            slide_id,
+            shape_id,
+            theme_name=theme_name,
+            bind_theme=True,
+            **spec["style"],
+        )
+    return shape_id
 
 
-def add_table_block(
-    editor: PptxEditor,
-    slide_index: int,
-    table_data: list[list[str]],
-    x: float,
-    y: float,
-    w: float,
-    h: float,
-    *,
-    style: Optional[Dict[str, Any]] = None,
+def _create_citation(
+    editor: PptxEditor, slide_id: int, spec: Dict[str, Any], theme_name: str
 ) -> int:
+    shape_id = editor.add_textbox_by_id(
+        slide_id,
+        spec.get("x", 0.5),
+        spec.get("y", 6.8),
+        spec.get("w", 9.0),
+        spec.get("h", 0.4),
+    )
+    editor.insert_text_by_id(slide_id, shape_id, _get_required(spec, "text"))
+
+    style = {"font_size_pt": 10, "italic": True}
+    style.update(spec.get("style", {}))
+    editor.style_text_by_id(
+        slide_id,
+        shape_id,
+        theme_name=theme_name,
+        bind_theme=True,
+        **style,
+    )
+    return shape_id
+
+
+def _create_chart(
+    editor: PptxEditor, slide_id: int, spec: Dict[str, Any], theme_name: str
+) -> int:
+    return editor.add_chart_by_id(
+        slide_id,
+        _get_required(spec, "chart_type"),
+        _get_required(spec, "chart_data"),
+        _get_required(spec, "x"),
+        _get_required(spec, "y"),
+        _get_required(spec, "w"),
+        _get_required(spec, "h"),
+        style=spec.get("style"),
+        theme_name=theme_name,
+        bind_theme=True,
+    )
+
+
+def _create_table(
+    editor: PptxEditor, slide_id: int, spec: Dict[str, Any], theme_name: str
+) -> int:
+    table_data = _get_required(spec, "table_data")
     rows = len(table_data)
     cols = max((len(row) for row in table_data), default=0)
     if rows == 0 or cols == 0:
         raise ValueError("table_data must include at least one row and one column")
 
-    editor._validate_slide(slide_index)
-    slide = editor.prs.slides[slide_index]
-    editor.add_table(slide_index, rows, cols, table_data, x, y, w, h, style=style)
-    return len(slide.shapes) - 1
+    return editor.add_table_by_id(
+        slide_id,
+        rows,
+        cols,
+        table_data,
+        _get_required(spec, "x"),
+        _get_required(spec, "y"),
+        _get_required(spec, "w"),
+        _get_required(spec, "h"),
+        style=spec.get("style"),
+        theme_name=theme_name,
+        bind_theme=True,
+    )
 
 
-def add_citation_block(
-    editor: PptxEditor,
-    slide_index: int,
-    text: str,
-    *,
-    font_name: Optional[str] = None,
-    font_size_pt: Optional[int] = None,
-    italic: Optional[bool] = True,
-    color_hex: Optional[str] = None,
+def _create_image(
+    editor: PptxEditor, slide_id: int, spec: Dict[str, Any], theme_name: str
 ) -> int:
-    editor._validate_slide(slide_index)
-    slide = editor.prs.slides[slide_index]
-    editor.add_citation(slide_index, text)
-    shape_index = len(slide.shapes) - 1
-    if any(value is not None for value in (font_name, font_size_pt, italic, color_hex)):
-        editor.style_update(
-            slide_index,
-            shape_index,
-            font_name=font_name,
-            font_size_pt=font_size_pt,
-            italic=italic,
-            color_hex=color_hex,
+    del theme_name
+    return editor.add_image_by_id(
+        slide_id,
+        _get_required(spec, "image_path"),
+        _get_required(spec, "x"),
+        _get_required(spec, "y"),
+        cx=spec.get("w"),
+        cy=spec.get("h"),
+    )
+
+
+def _update_text(
+    editor: PptxEditor, slide_id: int, spec: Dict[str, Any], theme_name: str
+) -> int:
+    shape_id = _get_required(spec, "shape_id")
+    _apply_geometry_updates(editor, slide_id, shape_id, spec)
+    if "text" in spec:
+        editor.insert_text_by_id(slide_id, shape_id, spec["text"])
+    if "style" in spec:
+        _remove_bindings(
+            editor,
+            slide_id=slide_id,
+            shape_id=shape_id,
+            apply_method="style_text_by_id",
         )
-    return shape_index
+        editor.style_text_by_id(
+            slide_id,
+            shape_id,
+            theme_name=theme_name,
+            bind_theme=True,
+            **spec["style"],
+        )
+    return shape_id
+
+
+def _update_citation(
+    editor: PptxEditor, slide_id: int, spec: Dict[str, Any], theme_name: str
+) -> int:
+    shape_id = _update_text(editor, slide_id, spec, theme_name)
+    shape = editor._get_shape_by_id(slide_id, shape_id)
+    if not shape.has_text_frame:
+        raise ValueError("Shape has no text frame.")
+    return shape_id
+
+
+def _update_chart(
+    editor: PptxEditor, slide_id: int, spec: Dict[str, Any], theme_name: str
+) -> int:
+    shape_id = _get_required(spec, "shape_id")
+    _apply_geometry_updates(editor, slide_id, shape_id, spec)
+    if "style" in spec:
+        _remove_bindings(
+            editor,
+            slide_id=slide_id,
+            shape_id=shape_id,
+            apply_method="style_chart_by_id",
+        )
+        editor.style_chart_by_id(
+            slide_id,
+            shape_id,
+            theme_name=theme_name,
+            bind_theme=True,
+            **spec["style"],
+        )
+    return shape_id
+
+
+def _update_table(
+    editor: PptxEditor, slide_id: int, spec: Dict[str, Any], theme_name: str
+) -> int:
+    shape_id = _get_required(spec, "shape_id")
+    _apply_geometry_updates(editor, slide_id, shape_id, spec)
+    if "style" in spec:
+        _remove_bindings(
+            editor,
+            slide_id=slide_id,
+            shape_id=shape_id,
+            apply_method="style_table_by_id",
+        )
+        editor.style_table_by_id(
+            slide_id,
+            shape_id,
+            theme_name=theme_name,
+            bind_theme=True,
+            **spec["style"],
+        )
+    return shape_id
+
+
+def _update_accent_bar(
+    editor: PptxEditor, slide_id: int, spec: Dict[str, Any], theme_name: str
+) -> int:
+    shape_id = _get_required(spec, "shape_id")
+    _apply_geometry_updates(editor, slide_id, shape_id, spec)
+    if "height" in spec:
+        shape = editor._get_shape_by_id(slide_id, shape_id)
+        shape.height = Inches(spec["height"])
+    if "color_hex" in spec:
+        _remove_bindings(
+            editor,
+            slide_id=slide_id,
+            shape_id=shape_id,
+            apply_method="style_shape_fill_by_id",
+        )
+        editor.style_shape_fill_by_id(
+            slide_id,
+            shape_id,
+            fill_color_hex=spec["color_hex"],
+            theme_name=theme_name,
+            bind_theme=True,
+        )
+    return shape_id
+
+
+def _update_image(
+    editor: PptxEditor, slide_id: int, spec: Dict[str, Any], theme_name: str
+) -> int:
+    del theme_name
+    shape_id = _get_required(spec, "shape_id")
+    if "image_path" in spec:
+        raise ValueError(
+            "Updating image content is not supported; delete and re-add the image"
+        )
+    _apply_geometry_updates(editor, slide_id, shape_id, spec)
+    return shape_id
+
+
+_CREATE_DISPATCH = {
+    "accent_bar": _create_accent_bar,
+    "text": _create_text,
+    "citation": _create_citation,
+    "chart": _create_chart,
+    "table": _create_table,
+    "image": _create_image,
+}
+
+_UPDATE_DISPATCH = {
+    "accent_bar": _update_accent_bar,
+    "text": _update_text,
+    "citation": _update_citation,
+    "chart": _update_chart,
+    "table": _update_table,
+    "image": _update_image,
+}
+
+
+def _create_shape_from_spec(
+    editor: PptxEditor, slide_id: int, spec: Dict[str, Any], theme_name: str
+) -> int:
+    shape_type = _get_required(spec, "type")
+    if shape_type not in _CREATE_DISPATCH:
+        raise ValueError(f"Unsupported shape type '{shape_type}'")
+    return _CREATE_DISPATCH[shape_type](editor, slide_id, spec, theme_name)
+
+
+def _update_shape_from_spec(
+    editor: PptxEditor, slide_id: int, spec: Dict[str, Any], theme_name: str
+) -> int:
+    shape_type = _get_required(spec, "type")
+    if shape_type not in _UPDATE_DISPATCH:
+        raise ValueError(f"Unsupported shape type '{shape_type}'")
+    return _UPDATE_DISPATCH[shape_type](editor, slide_id, spec, theme_name)
+
+
+def _delete_shape(editor: PptxEditor, slide_id: int, shape_id: int) -> None:
+    shape = editor._get_shape_by_id(slide_id, shape_id)
+    shape._element.getparent().remove(shape._element)
+    _remove_bindings(editor, slide_id=slide_id, shape_id=shape_id)
+
+
+def create_slide(
+    editor: PptxEditor,
+    *,
+    layout_index: int = 6,
+    theme_name: str = "default",
+    background_color: Optional[str] = None,
+    shapes: Optional[list[Dict[str, Any]]] = None,
+) -> Dict[str, Any]:
+    slide_index = editor.add_slide(layout_index)
+    slide_id = editor.get_slide_id(slide_index)
+    result = {"slide_id": slide_id, "shape_ids": [], "named_shapes": {}}
+
+    if background_color is not None:
+        editor.set_slide_background_by_id(
+            slide_id,
+            background_color,
+            theme_name=theme_name,
+            bind_theme=True,
+        )
+
+    for spec in shapes or []:
+        shape_id = _create_shape_from_spec(editor, slide_id, spec, theme_name)
+        result["shape_ids"].append(shape_id)
+        _record_named_shape(result, spec, shape_id)
+
+    return result
+
+
+def update_slide(
+    editor: PptxEditor,
+    slide_id: int,
+    *,
+    theme_name: str = "default",
+    background_color: Optional[str] = None,
+    delete_shape_ids: Optional[list[int]] = None,
+    add_shapes: Optional[list[Dict[str, Any]]] = None,
+    update_shapes: Optional[list[Dict[str, Any]]] = None,
+) -> Dict[str, Any]:
+    editor._get_slide_by_id(slide_id)
+    delete_shape_ids = delete_shape_ids or []
+    add_shapes = add_shapes or []
+    update_shapes = update_shapes or []
+
+    delete_set = set(delete_shape_ids)
+    if len(delete_set) != len(delete_shape_ids):
+        raise ValueError("delete_shape_ids contains duplicates")
+
+    update_shape_ids = []
+    for spec in update_shapes:
+        shape_id = _get_required(spec, "shape_id")
+        if shape_id in delete_set:
+            raise ValueError(
+                f"Shape id {shape_id} cannot be both updated and deleted in one call"
+            )
+        update_shape_ids.append(shape_id)
+
+    if len(set(update_shape_ids)) != len(update_shape_ids):
+        raise ValueError("update_shapes contains duplicate shape_id values")
+
+    result = {
+        "slide_id": slide_id,
+        "deleted_shape_ids": [],
+        "updated_shape_ids": [],
+        "created_shape_ids": [],
+        "named_shapes": {},
+    }
+
+    if background_color is not None:
+        _remove_bindings(
+            editor,
+            slide_id=slide_id,
+            shape_id=None,
+            apply_method="set_slide_background_by_id",
+        )
+        editor.set_slide_background_by_id(
+            slide_id,
+            background_color,
+            theme_name=theme_name,
+            bind_theme=True,
+        )
+
+    for spec in update_shapes:
+        shape_id = _update_shape_from_spec(editor, slide_id, spec, theme_name)
+        result["updated_shape_ids"].append(shape_id)
+        _record_named_shape(result, spec, shape_id)
+
+    for spec in add_shapes:
+        shape_id = _create_shape_from_spec(editor, slide_id, spec, theme_name)
+        result["created_shape_ids"].append(shape_id)
+        _record_named_shape(result, spec, shape_id)
+
+    for shape_id in delete_shape_ids:
+        _delete_shape(editor, slide_id, shape_id)
+        result["deleted_shape_ids"].append(shape_id)
+
+    return result
 
 
 __all__ = [
-    "PptxEditor",
-    "rgb",
-    "create_presentation",
-    "save_presentation",
-    "get_theme_preset",
-    "apply_slide_background",
-    "add_accent_bar",
-    "apply_slide_theme",
-    "add_blank_slide",
-    "add_textbox",
-    "add_text_block",
-    "add_chart_block",
-    "add_table_block",
-    "add_citation_block",
+    "register_theme",
+    "update_theme",
+    "create_slide",
+    "update_slide",
 ]
