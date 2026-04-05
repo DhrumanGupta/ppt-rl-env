@@ -93,14 +93,12 @@ Use a **hierarchical action interface**:
    - `DELETE_SLIDE`
    - `REORDER_SLIDE`
    - `SET_SLIDE_LAYOUT`
-   - `WRITE_TITLE`
-   - `WRITE_BULLETS`
+   - `INSERT_TEXT`
    - `ADD_CHART`
    - `ADD_TABLE`
    - `ADD_IMAGE`
    - `ADD_CITATION`
    - `STYLE_UPDATE`
-   - `REFINE_TEXT`
    - `VERIFY_FACT`
    - `STOP`
 
