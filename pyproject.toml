@@ -26,6 +26,7 @@ dependencies = [
     # "gymnasium>=0.29.0",
     # "openspiel>=1.0.0",
     # "smolagents>=1.22.0,<2",
+    "python-pptx>=1.0.2",
 ]
 
 [project.optional-dependencies]
@@ -43,3 +44,8 @@ server = "ppt_agent.server.app:main"
 include-package-data = true
 packages = ["ppt_agent", "ppt_agent.server"]
 package-dir = { "ppt_agent" = ".", "ppt_agent.server" = "server" }
+
+[dependency-groups]
+dev = [
+    "pytest>=9.0.2",
+]

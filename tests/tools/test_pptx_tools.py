@@ -3,7 +3,7 @@ from pptx.enum.chart import XL_CHART_TYPE
 from pptx.enum.shapes import MSO_CONNECTOR
 from pptx.util import Inches
 
-from src.utils.pptx_functions import PptxEditor
+from server.utils.pptx_functions import PptxEditor
 
 
 @pytest.fixture

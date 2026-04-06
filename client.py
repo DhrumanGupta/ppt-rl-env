@@ -12,12 +12,13 @@ from openenv.core import EnvClient
 from openenv.core.client_types import StepResult
 from openenv.core.env_server.types import State
 
-from .models import PptAgentAction, PptAgentObservation
+try:
+    from .models import PptAgentAction, PptAgentObservation
+except ImportError:  # pragma: no cover
+    from models import PptAgentAction, PptAgentObservation
 
 
-class PptAgentEnv(
-    EnvClient[PptAgentAction, PptAgentObservation, State]
-):
+class PptAgentEnv(EnvClient[PptAgentAction, PptAgentObservation, State]):
     """
     Client for the Ppt Agent Environment.
 

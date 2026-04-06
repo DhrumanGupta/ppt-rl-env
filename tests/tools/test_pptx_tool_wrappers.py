@@ -1,12 +1,12 @@
 import pytest
 
-from src.tools.pptx_tools import (
+from server.tools.pptx_tools import (
     create_slide,
     register_theme,
     update_slide,
     update_theme,
 )
-from src.utils.pptx_functions import PptxEditor
+from server.utils.pptx_functions import PptxEditor
 
 
 @pytest.fixture

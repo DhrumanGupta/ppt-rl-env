@@ -2,7 +2,7 @@ from typing import Any, Dict, Optional
 
 from pptx.util import Inches
 
-from src.utils.pptx_functions import PptxEditor
+from server.utils.pptx_functions import PptxEditor
 
 
 _SHAPE_ID_UNSET = object()

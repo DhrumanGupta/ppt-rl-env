@@ -2,7 +2,7 @@
 
 ## 0) Objective
 
-Implement a reward kernel under `src/utils` for a prompt-to-PPT RL environment that combines:
+Implement a reward kernel under `server/utils` for a prompt-to-PPT RL environment that combines:
 
 - **PresentBench-style grounded rubric scoring**
 - **SlidesGen-Bench-style quantitative scoring**
@@ -52,8 +52,8 @@ The kernel must **not** use OCR-first extraction when native object data is avai
 
 This spec is grounded in the current presentation object surface in this repo:
 
-- `src/utils/pptx_functions.py`
-- `src/tools/pptx_tools.py`
+- `server/utils/pptx_functions.py`
+- `server/tools/pptx_tools.py`
 
 The current tool surface supports these native shape kinds:
 
@@ -100,8 +100,8 @@ Related design doc:
 
 Native PPT object references:
 
-- `src/utils/pptx_functions.py`
-- `src/tools/pptx_tools.py`
+- `server/utils/pptx_functions.py`
+- `server/tools/pptx_tools.py`
 
 ---
 
@@ -109,14 +109,14 @@ Native PPT object references:
 
 Primary file to implement:
 
-- `src/utils/reward_kernel.py`
+- `server/utils/reward_kernel.py`
 
 Recommended companion files:
 
-- `src/utils/reward_models.py`
-- `src/utils/reward_prompts.py`
-- `src/utils/reward_inspection.py`
-- `src/utils/reward_metrics.py`
+- `server/utils/reward_models.py`
+- `server/utils/reward_prompts.py`
+- `server/utils/reward_inspection.py`
+- `server/utils/reward_metrics.py`
 
 The implementation should be modular even if initially kept in a single file.
 

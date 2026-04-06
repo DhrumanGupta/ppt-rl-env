@@ -1,14 +1,12 @@
 import sys
 from pathlib import Path
 
-
 ROOT = Path(__file__).resolve().parents[2]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from src.tools.pptx_tools import create_slide, register_theme
-from src.utils.pptx_functions import PptxEditor
-
+from server.tools.pptx_tools import create_slide, register_theme
+from server.utils.pptx_functions import PptxEditor
 
 OUTPUT_DIR = ROOT / "outputs" / "test_slides"
 
