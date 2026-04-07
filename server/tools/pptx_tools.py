@@ -1,3 +1,5 @@
+from os import PathLike
+from pathlib import Path
 from typing import Any, Dict, Optional
 
 from pptx.util import Inches
@@ -6,6 +8,18 @@ from server.utils.pptx_functions import PptxEditor
 
 
 _SHAPE_ID_UNSET = object()
+
+
+def create_presentation(path: Optional[str | PathLike[str]] = None) -> PptxEditor:
+    if path is None:
+        return PptxEditor()
+    return PptxEditor(str(path))
+
+
+def save_presentation(editor: PptxEditor, path: str | PathLike[str]) -> None:
+    output_path = Path(path)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    editor.prs.save(output_path)
 
 
 def register_theme(
@@ -466,6 +480,8 @@ def update_slide(
 
 
 __all__ = [
+    "create_presentation",
+    "save_presentation",
     "register_theme",
     "update_theme",
     "create_slide",

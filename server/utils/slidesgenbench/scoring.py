@@ -3,11 +3,15 @@ from __future__ import annotations
 from server.utils.reward_metrics import slide_text_corpus, text_match_score
 from server.utils.reward_models import (
     ExtractedPresentation,
+    RenderedPresentation,
     SlidesGenBenchEvalSpec,
     SlidesGenBenchScoreResult,
     TaskSpec,
 )
 from server.utils.slidesgenbench.quantitative_judge import QuantitativeQuizJudgeService
+from server.utils.slidesgenbench.rendered_aesthetics import (
+    compute_rendered_aesthetics_scores,
+)
 
 
 def score_slidesgenbench(
@@ -16,6 +20,7 @@ def score_slidesgenbench(
     eval_spec: SlidesGenBenchEvalSpec,
     *,
     quantitative_quiz_judge_service: QuantitativeQuizJudgeService,
+    rendered_presentation: RenderedPresentation | None = None,
 ) -> SlidesGenBenchScoreResult:
     deck_text = "\n".join(
         slide_text_corpus(slide) for slide in presentation_extraction.slides
@@ -84,21 +89,45 @@ def score_slidesgenbench(
         quiz_split.get("qualitative", 0.5) * s_quiz_qualitative
         + quiz_split.get("quantitative", 0.5) * s_quiz_quantitative
     )
+    aesthetics_scores = compute_rendered_aesthetics_scores(
+        rendered_presentation,
+        presentation_extraction,
+        metric_weights=eval_spec.scoring_config.get("aesthetic_weights"),
+        harmony_config=eval_spec.scoring_config.get("harmony_config"),
+        rhythm_config=eval_spec.scoring_config.get("rhythm_config"),
+    )
+    branch_split = eval_spec.scoring_config.get(
+        "branch_split", {"content": 0.65, "aesthetics": 0.35}
+    )
+    s_aesthetic = float(aesthetics_scores.get("aesthetic", 0.0))
+    reward_total = (
+        branch_split.get("content", 0.65) * s_quiz
+        + branch_split.get("aesthetics", 0.35) * s_aesthetic
+    )
     return SlidesGenBenchScoreResult(
-        reward_total=s_quiz,
+        reward_total=reward_total,
         reward_breakdown={
-            "R_sg": s_quiz,
+            "R_sg": reward_total,
             "S_quiz": s_quiz,
             "S_quiz_qualitative": s_quiz_qualitative,
             "S_quiz_quantitative": s_quiz_quantitative,
+            "S_aesthetic": s_aesthetic,
+            "S_harmony": float(aesthetics_scores.get("harmony", 0.0)),
+            "S_engagement": float(aesthetics_scores.get("engagement", 0.0)),
+            "S_usability": float(aesthetics_scores.get("usability", 0.0)),
+            "S_rhythm": float(aesthetics_scores.get("rhythm", 0.0)),
         },
         quiz_results=quiz_results,
+        aesthetics_results=aesthetics_scores,
         metadata={
             "task_id": eval_spec.task_spec.task_id,
             "question_count": len(eval_spec.quiz_bank),
             "slide_count": presentation_extraction.slide_count,
             "spec_hash": eval_spec.spec_hash,
             "quantitative_judge": judge_metadata,
+            "rendered_slide_count": len(rendered_presentation.slide_images)
+            if rendered_presentation is not None
+            else 0,
         },
     )
 

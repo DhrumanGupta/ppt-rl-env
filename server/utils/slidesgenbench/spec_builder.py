@@ -14,7 +14,32 @@ from server.utils.slidesgenbench.quizbank_service import QuizBankGenerationServi
 SPEC_VERSION = "1.0"
 
 DEFAULT_SLIDESGENBENCH_SCORING_CONFIG = {
+    "branch_split": {"content": 0.65, "aesthetics": 0.35},
     "quiz_split": {"qualitative": 0.5, "quantitative": 0.5},
+    "aesthetic_weights": {
+        "harmony": 0.20,
+        "engagement": 0.20,
+        "usability": 0.35,
+        "rhythm": 0.25,
+    },
+    "harmony_config": {
+        "saturation_threshold": 0.1,
+        "downsample_max_side": 256,
+        "rotation_steps": 72,
+        "gaussian_sigma_degrees": 28.0,
+        "deck_mean_weight": 1.0,
+        "deck_std_penalty": 0.3,
+    },
+    "rhythm_config": {
+        "downsample_max_side": 256,
+        "entropy_bins": 32,
+        "luminance_weight": 0.84,
+        "chroma_weight": 0.08,
+        "rmssd_target": 0.12,
+        "rmssd_spread": 0.08,
+        "overload_threshold": 0.82,
+        "overload_penalty_weight": 0.15,
+    },
 }
 
 

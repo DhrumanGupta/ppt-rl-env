@@ -186,6 +186,7 @@ def evaluate_presentation(
         presentation_extraction,
         eval_spec.slidesgenbench,
         quantitative_quiz_judge_service=quantitative_quiz_judge_service,
+        rendered_presentation=rendered_presentation,
     )
 
     branch_weights = eval_spec.scoring_config["branch_weights"]
@@ -207,7 +208,11 @@ def evaluate_presentation(
         soft_penalties=presentbench_result.soft_penalties,
         checklist_results=presentbench_result.checklist_results,
         quiz_results=slidesgenbench_result.quiz_results,
-        aesthetics_results=presentbench_result.aesthetics_results,
+        aesthetics_results=(
+            slidesgenbench_result.aesthetics_results
+            if slidesgenbench_result.aesthetics_results
+            else presentbench_result.aesthetics_results
+        ),
         artifacts={
             "presentation_digest": presentation_extraction.metadata.get(
                 "presentation_digest"

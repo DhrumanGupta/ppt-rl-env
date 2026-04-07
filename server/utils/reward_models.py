@@ -41,23 +41,6 @@ class TaskConstraints:
     extra_constraints: dict[str, Any] = field(default_factory=dict)
 
 
-# TODO: Remove
-@dataclass(slots=True)
-class CapabilityProfile:
-    supported_shape_kinds: set[str] = field(
-        default_factory=lambda: set(SUPPORTED_SHAPE_KINDS)
-    )
-    supports_native_text: bool = True
-    supports_native_chart: bool = True
-    supports_native_table: bool = True
-    supports_native_image: bool = True
-    supports_runtime_theme_binding: bool = True
-    supports_grouping: bool = False
-    supports_master_editing: bool = False
-    supports_animation: bool = False
-    supports_embedded_media: bool = False
-
-
 @dataclass(slots=True)
 class ExtractedTextBlock:
     paragraph_texts: list[str] = field(default_factory=list)
@@ -139,11 +122,6 @@ class ExtractedPresentation:
     slide_count: int
     slide_ids: list[int] = field(default_factory=list)
     slides: list[ExtractedSlide] = field(default_factory=list)
-    # TODO: Remove
-    deck_metrics: dict[str, Any] = field(default_factory=dict)
-    # TODO: Remove
-    theme_summary: dict[str, Any] = field(default_factory=dict)
-    # TODO: Remove
     metadata: dict[str, Any] = field(default_factory=dict)
 
 
@@ -192,7 +170,6 @@ class TaskSpec:
     required_slides: list[RequiredSlideSpec] | None = None
     citation_required: bool = False
     require_quantitative_content: bool = False
-    capability_profile: CapabilityProfile = field(default_factory=CapabilityProfile)
     metadata: dict[str, Any] = field(default_factory=dict)
 
 
@@ -287,6 +264,7 @@ class SlidesGenBenchScoreResult:
     reward_total: float
     reward_breakdown: dict[str, float] = field(default_factory=dict)
     quiz_results: list[dict[str, Any]] = field(default_factory=list)
+    aesthetics_results: dict[str, Any] = field(default_factory=dict)
     metadata: dict[str, Any] = field(default_factory=dict)
 
 
@@ -333,7 +311,6 @@ __all__ = [
     "SourceDocument",
     "SourcePack",
     "TaskConstraints",
-    "CapabilityProfile",
     "ExtractedTextBlock",
     "ExtractedChart",
     "ExtractedTable",

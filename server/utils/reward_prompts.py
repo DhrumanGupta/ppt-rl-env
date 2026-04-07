@@ -7,7 +7,6 @@ from dataclasses import dataclass
 from typing import Any
 
 from server.utils.reward_models import (
-    CapabilityProfile,
     RequiredSlideSpec,
     SourcePack,
     TaskConstraints,
@@ -253,7 +252,6 @@ def build_task_spec(
     prompt: str,
     source_pack: SourcePack,
     task_constraints: TaskConstraints | None = None,
-    capability_profile: CapabilityProfile | None = None,
 ) -> TaskSpec:
     normalized_prompt = normalize_prompt(prompt)
     required_slides = parse_required_slides(prompt)
@@ -306,7 +304,6 @@ def build_task_spec(
         required_slides=required_slides or None,
         citation_required=citation_required,
         require_quantitative_content=require_quantitative_content,
-        capability_profile=capability_profile or CapabilityProfile(),
         metadata={
             "source_digest": source_pack_digest(source_pack),
             "source_facts": facts,

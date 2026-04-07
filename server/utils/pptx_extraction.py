@@ -450,6 +450,8 @@ class PptxExtractionService:
     ) -> ExtractedPresentation:
         opened = open_presentation(presentation)
         slides = []
+        slide_width = _emu_to_inches(opened.presentation.slide_width)
+        slide_height = _emu_to_inches(opened.presentation.slide_height)
         for slide_index, slide in enumerate(opened.presentation.slides, start=1):
             slides.append(
                 self.inspect_slide(
@@ -458,37 +460,16 @@ class PptxExtractionService:
                 )
             )
 
-        palette = Counter(
-            color
-            for slide in slides
-            for color in slide.color_metrics.get("palette", [])
-            if color
-        )
-
         return ExtractedPresentation(
             slide_count=len(slides),
             slide_ids=[slide.slide_id for slide in slides],
             slides=slides,
-            deck_metrics={
-                "inspection_mode": opened.inspection_mode,
-                "chart_count": sum(
-                    slide.layout_metrics.get("chart_count", 0) for slide in slides
-                ),
-                "table_count": sum(
-                    slide.layout_metrics.get("table_count", 0) for slide in slides
-                ),
-                "image_count": sum(
-                    slide.layout_metrics.get("image_count", 0) for slide in slides
-                ),
-                "citation_count": sum(len(slide.citations) for slide in slides),
-            },
-            theme_summary={
-                "dominant_colors": [color for color, _count in palette.most_common(5)],
-            },
             metadata={
                 "inspection_mode": opened.inspection_mode,
                 "source_path": opened.source_path,
                 "presentation_digest": presentation_digest(opened.presentation),
+                "slide_width_in": slide_width,
+                "slide_height_in": slide_height,
             },
         )
 
@@ -555,6 +536,8 @@ class PptxExtractionService:
             color_metrics=_color_metrics(slide, shapes),
             metadata={
                 "inspection_mode": opened.inspection_mode,
+                "slide_width_in": slide_width,
+                "slide_height_in": slide_height,
             },
         )
 
