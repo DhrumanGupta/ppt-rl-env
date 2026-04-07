@@ -15,6 +15,7 @@ SPEC_VERSION = "1.0"
 
 DEFAULT_SLIDESGENBENCH_SCORING_CONFIG = {
     "quiz_split": {"qualitative": 0.5, "quantitative": 0.5},
+    "sg_branch_weights": {"quiz": 0.45, "aesthetic": 0.35, "editability": 0.20},
 }
 
 

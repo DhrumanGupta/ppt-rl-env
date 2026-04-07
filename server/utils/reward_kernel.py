@@ -173,12 +173,26 @@ def evaluate_presentation(
         eval_spec.task_spec,
         presentation_extraction,
         eval_spec.slidesgenbench,
+        presentation=presentation,
+        aesthetics_service=aesthetics_service,
     )
+
+    # --- Hard caps: merge PresentBench caps with editability cap ---
+    hard_caps = dict(presentbench_result.hard_caps)
+    pei_level = slidesgenbench_result.editability_results.get("pei_level", 0)
+    required_pei = eval_spec.scoring_config.get("required_pei_level", 3)
+    c_editability_req = 0.7 if pei_level < required_pei else 1.0
+    hard_caps["C_editability_req"] = c_editability_req
+    c_hard_pb = hard_caps.get("C_hard", 1.0)
+    hard_caps["C_hard"] = min(c_hard_pb, c_editability_req)
 
     branch_weights = eval_spec.scoring_config["branch_weights"]
     reward_total = clamp(
-        branch_weights["presentbench"] * presentbench_result.reward_total
-        + branch_weights["slidesgenbench"] * slidesgenbench_result.reward_total
+        hard_caps["C_hard"]
+        * (
+            branch_weights["presentbench"] * presentbench_result.reward_total
+            + branch_weights["slidesgenbench"] * slidesgenbench_result.reward_total
+        )
     )
 
     return RewardResult(
@@ -190,7 +204,7 @@ def evaluate_presentation(
             **presentbench_result.reward_breakdown,
             **slidesgenbench_result.reward_breakdown,
         },
-        hard_caps=presentbench_result.hard_caps,
+        hard_caps=hard_caps,
         soft_penalties=presentbench_result.soft_penalties,
         checklist_results=presentbench_result.checklist_results,
         quiz_results=slidesgenbench_result.quiz_results,
@@ -213,6 +227,7 @@ def evaluate_presentation(
             "judge_call_count": 0,
             "failure_counts": {"inspection": 0, "judge": 0, "render": 0},
             "used_mllm": use_mllm,
+            "pei_level": pei_level,
             "inspection_mode": presentation_extraction.metadata.get("inspection_mode"),
             "presentation_digest": presentation_extraction.metadata.get(
                 "presentation_digest"

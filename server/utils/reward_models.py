@@ -268,6 +268,8 @@ class SlidesGenBenchScoreResult:
     reward_total: float
     reward_breakdown: dict[str, float] = field(default_factory=dict)
     quiz_results: list[dict[str, Any]] = field(default_factory=list)
+    editability_results: dict[str, Any] = field(default_factory=dict)
+    aesthetics_results: dict[str, Any] = field(default_factory=dict)
     metadata: dict[str, Any] = field(default_factory=dict)
 
 

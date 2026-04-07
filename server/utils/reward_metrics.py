@@ -11,6 +11,27 @@ from server.utils.reward_models import ExtractedPresentation, ExtractedSlide
 
 
 _NUMBER_PATTERN = re.compile(r"\b\d+(?:\.\d+)?%?\b")
+_NUMERIC_BOUNDARY_PATTERN = re.compile(
+    r"(?<![0-9])"
+    r"[\$\u00a3\u20ac]?"
+    r"\d{1,3}(?:,\d{3})*(?:\.\d+)?"
+    r"[%]?"
+    r"(?:\s*(?:million|billion|trillion|thousand|mn|bn|tn|m|b|k))?"
+    r"(?![0-9])",
+    re.IGNORECASE,
+)
+_MAGNITUDE_MAP: dict[str, int] = {
+    "k": 1_000,
+    "thousand": 1_000,
+    "m": 1_000_000,
+    "mn": 1_000_000,
+    "million": 1_000_000,
+    "b": 1_000_000_000,
+    "bn": 1_000_000_000,
+    "billion": 1_000_000_000,
+    "tn": 1_000_000_000_000,
+    "trillion": 1_000_000_000_000,
+}
 _TEXT_UNIT_SPLIT_PATTERN = re.compile(r"(?<=[.!?])\s+|\n+")
 _DEFAULT_SENTENCE_MODEL = os.environ.get(
     "SENTENCE_TRANSFORMER_MODEL",
@@ -44,6 +65,49 @@ def _similarity_model():
     from sentence_transformers import SentenceTransformer
 
     return SentenceTransformer(_DEFAULT_SENTENCE_MODEL)
+
+
+def _parse_numeric_value(raw: str) -> float | None:
+    """Parse a numeric string into a canonical float.
+
+    Handles commas, currency symbols, percentage signs, and magnitude
+    suffixes (e.g. "1.2M", "$3,400", "25%", "2 billion").
+    """
+    cleaned = raw.strip().lstrip("$\u00a3\u20ac")
+    cleaned = cleaned.replace(",", "")
+    magnitude = 1
+    for suffix, factor in _MAGNITUDE_MAP.items():
+        if cleaned.lower().endswith(suffix):
+            cleaned = cleaned[: -len(suffix)].rstrip()
+            magnitude = factor
+            break
+    is_percent = cleaned.endswith("%")
+    if is_percent:
+        cleaned = cleaned[:-1]
+    try:
+        value = float(cleaned) * magnitude
+    except ValueError:
+        return None
+    if is_percent:
+        value = round(value, 6)
+    return value
+
+
+def normalized_number_match(candidate_text: str, target: str) -> bool:
+    """Check if *target* numeric value appears in *candidate_text*.
+
+    Uses word-boundary-aware extraction and canonical float comparison
+    to avoid false positives (e.g. "25%" inside "125%") and false
+    negatives (e.g. "1,234" vs "1234", "$5.2M" vs "5.2 million").
+    """
+    target_val = _parse_numeric_value(target)
+    if target_val is None:
+        return target in candidate_text
+    for match in _NUMERIC_BOUNDARY_PATTERN.finditer(candidate_text):
+        candidate_val = _parse_numeric_value(match.group())
+        if candidate_val is not None and abs(candidate_val - target_val) < 1e-6:
+            return True
+    return False
 
 
 def extract_numbers(text: str | None) -> list[str]:
@@ -137,6 +201,7 @@ __all__ = [
     "extract_numbers",
     "is_blank_or_title_only",
     "normalize_text",
+    "normalized_number_match",
     "slide_text_corpus",
     "text_match_score",
 ]
