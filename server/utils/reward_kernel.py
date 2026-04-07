@@ -159,13 +159,21 @@ def evaluate_presentation(
     quantitative_quiz_judge_service: QuantitativeQuizJudgeService,
     mode: str = "eval",
 ) -> RewardResult:
-    del judge, render_service
+    del judge
     inspection_service = inspection_service or PptxExtractionService()
 
     try:
         presentation_extraction = inspection_service.inspect_presentation(presentation)
     except Exception as error:
         return _reward_result_for_failure(eval_spec, error=error, mode=mode)
+
+    rendered_presentation = None
+    render_error: str | None = None
+    if render_service and hasattr(render_service, "render_presentation"):
+        try:
+            rendered_presentation = render_service.render_presentation(presentation)
+        except Exception as error:
+            render_error = str(error)
 
     presentbench_result = score_presentbench(
         eval_spec.task_spec,
@@ -178,6 +186,7 @@ def evaluate_presentation(
         presentation_extraction,
         eval_spec.slidesgenbench,
         quantitative_quiz_judge_service=quantitative_quiz_judge_service,
+        rendered_presentation=rendered_presentation,
     )
 
     branch_weights = eval_spec.scoring_config["branch_weights"]
@@ -199,11 +208,18 @@ def evaluate_presentation(
         soft_penalties=presentbench_result.soft_penalties,
         checklist_results=presentbench_result.checklist_results,
         quiz_results=slidesgenbench_result.quiz_results,
-        aesthetics_results=presentbench_result.aesthetics_results,
+        aesthetics_results=(
+            slidesgenbench_result.aesthetics_results
+            if slidesgenbench_result.aesthetics_results
+            else presentbench_result.aesthetics_results
+        ),
         artifacts={
             "presentation_digest": presentation_extraction.metadata.get(
                 "presentation_digest"
-            )
+            ),
+            "rendered_presentation": to_serializable(rendered_presentation)
+            if rendered_presentation is not None
+            else None,
         },
         metadata={
             "task_id": eval_spec.task_spec.task_id,
@@ -216,12 +232,18 @@ def evaluate_presentation(
             "presentbench_item_count": len(eval_spec.presentbench.checklist),
             "slidesgenbench_question_count": len(eval_spec.slidesgenbench.quiz_bank),
             "judge_call_count": 0,
-            "failure_counts": {"inspection": 0, "judge": 0, "render": 0},
+            "failure_counts": {
+                "inspection": 0,
+                "judge": 0,
+                "render": 0 if render_error is None else 1,
+            },
             "used_mllm": use_mllm,
             "inspection_mode": presentation_extraction.metadata.get("inspection_mode"),
             "presentation_digest": presentation_extraction.metadata.get(
                 "presentation_digest"
             ),
+            "render_backend": getattr(rendered_presentation, "backend", None),
+            "render_error": render_error,
         },
     )
 

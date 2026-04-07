@@ -5,14 +5,18 @@ ROOT = Path(__file__).resolve().parents[2]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from server.tools.pptx_tools import create_slide, register_theme
-from server.utils.pptx_functions import PptxEditor
+from server.tools.pptx_tools import (
+    create_presentation,
+    create_slide,
+    register_theme,
+    save_presentation,
+)
 
 OUTPUT_DIR = ROOT / "outputs" / "test_slides"
 
 
 def build_modern_business_deck(output_path: Path):
-    editor = PptxEditor()
+    editor = create_presentation()
     register_theme(
         editor,
         {
@@ -223,12 +227,11 @@ def build_modern_business_deck(output_path: Path):
         ],
     )
 
-    output_path.parent.mkdir(parents=True, exist_ok=True)
-    editor.prs.save(output_path)
+    save_presentation(editor, output_path)
 
 
 def build_dark_analytics_deck(output_path: Path):
-    editor = PptxEditor()
+    editor = create_presentation()
     register_theme(
         editor,
         {
@@ -438,12 +441,11 @@ def build_dark_analytics_deck(output_path: Path):
         ],
     )
 
-    output_path.parent.mkdir(parents=True, exist_ok=True)
-    editor.prs.save(output_path)
+    save_presentation(editor, output_path)
 
 
 def build_academic_report_deck(output_path: Path):
-    editor = PptxEditor()
+    editor = create_presentation()
     register_theme(
         editor,
         {
@@ -654,8 +656,7 @@ def build_academic_report_deck(output_path: Path):
         ],
     )
 
-    output_path.parent.mkdir(parents=True, exist_ok=True)
-    editor.prs.save(output_path)
+    save_presentation(editor, output_path)
 
 
 def main():

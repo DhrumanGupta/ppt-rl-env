@@ -1,17 +1,19 @@
 import pytest
+from pptx import Presentation
 
 from server.tools.pptx_tools import (
+    create_presentation,
     create_slide,
     register_theme,
+    save_presentation,
     update_slide,
     update_theme,
 )
-from server.utils.pptx_functions import PptxEditor
 
 
 @pytest.fixture
 def themed_editor():
-    editor = PptxEditor()
+    editor = create_presentation()
     register_theme(
         editor,
         {
@@ -27,6 +29,31 @@ def themed_editor():
         },
     )
     return editor
+
+
+def test_create_and_save_presentation_via_tool_layer(tmp_path):
+    editor = create_presentation()
+    create_slide(
+        editor,
+        shapes=[
+            {
+                "type": "text",
+                "text": "Saved via tool layer",
+                "x": 1,
+                "y": 1,
+                "w": 4,
+                "h": 1,
+            }
+        ],
+    )
+
+    output_path = tmp_path / "nested" / "sample.pptx"
+    save_presentation(editor, output_path)
+
+    saved = Presentation(output_path)
+    assert output_path.exists()
+    assert len(saved.slides) == 1
+    assert saved.slides[0].shapes[0].text_frame.text == "Saved via tool layer"
 
 
 def slide_for_id(editor, slide_id):
