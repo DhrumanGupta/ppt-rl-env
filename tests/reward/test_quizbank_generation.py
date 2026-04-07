@@ -1,5 +1,5 @@
-from server.utils.reward_kernel import build_eval_spec
-from server.utils.reward_models import QuizQuestion, SourceDocument, SourcePack
+from server.utils.reward_models import SourceDocument, SourcePack
+from server.utils.reward_prompts import build_task_spec
 
 from tests.reward.quizbank_test_utils import (
     build_valid_quizbank_stage_responses,
@@ -38,95 +38,29 @@ def make_source_pack() -> SourcePack:
     )
 
 
-class StubQuizBankService:
-    def generate_quiz_bank(self, *, task_spec, source_pack, mode="eval"):
-        del task_spec, source_pack, mode
-        return (
-            [
-                QuizQuestion(
-                    question_id="quiz_stub_01",
-                    question_type="concept",
-                    question="Stub question?",
-                    options=["A", "B", "C", "D"],
-                    correct_answer="A",
-                    explanation="stub explanation",
-                    source_refs=["memo"],
-                    source_quotes=["stub quote"],
-                )
-            ],
-            {"service_name": "StubQuizBankService", "question_count": 1},
-        )
+def make_task_spec():
+    return build_task_spec(PROMPT, make_source_pack())
 
 
-def test_build_eval_spec_uses_injected_quizbank_service():
-    eval_spec = build_eval_spec(
-        PROMPT,
-        make_source_pack(),
-        quiz_bank_service=StubQuizBankService(),
-    )
-
-    assert [
-        question.question_id for question in eval_spec.slidesgenbench.quiz_bank
-    ] == ["quiz_stub_01"]
-    assert (
-        eval_spec.task_spec.metadata["quiz_bank_generation"]["service_name"]
-        == "StubQuizBankService"
-    )
-
-
-def test_explicit_quizbank_service_produces_source_grounded_questions():
+def test_generate_quiz_bank_returns_grounded_questions():
     quiz_bank_service, llm_client = make_quizbank_service()
-    eval_spec = build_eval_spec(
-        PROMPT,
-        make_source_pack(),
-        quiz_bank_service=quiz_bank_service,
+
+    questions, metadata = quiz_bank_service.generate_quiz_bank(
+        task_spec=make_task_spec(),
+        source_pack=make_source_pack(),
     )
 
-    assert {
-        question.question_type for question in eval_spec.slidesgenbench.quiz_bank
-    } == {
-        "concept",
-        "data",
+    assert {question.question_type for question in questions} == {
+        "qualitative",
+        "quantitative",
     }
     assert len(llm_client.calls) == 3
-    assert eval_spec.task_spec.metadata["quiz_bank_generation"]["service_name"]
-    assert all(question.source_refs for question in eval_spec.slidesgenbench.quiz_bank)
-    assert all(
-        question.source_quotes for question in eval_spec.slidesgenbench.quiz_bank
-    )
+    assert metadata["service_name"] == "SlidesGenQuizBankService"
+    assert all(question.source_refs for question in questions)
+    assert all(question.source_quotes for question in questions)
 
 
-def test_quiz_generation_retries_invalid_generation_payload_once():
-    responses = build_valid_quizbank_stage_responses()
-    invalid_generation = dict(responses[2])
-    invalid_generation["questions"] = invalid_generation["questions"][:-1]
-    quiz_bank_service, llm_client = make_quizbank_service(
-        [responses[0], responses[1], invalid_generation, responses[2]]
-    )
-
-    eval_spec = build_eval_spec(
-        PROMPT,
-        make_source_pack(),
-        quiz_bank_service=quiz_bank_service,
-    )
-
-    assert len(eval_spec.slidesgenbench.quiz_bank) == 10
-    assert len(llm_client.calls) == 4
-    assert (
-        eval_spec.task_spec.metadata["quiz_bank_generation"]["stage_diagnostics"][
-            "generation"
-        ]["full_generation_invalid_count"]
-        == 1
-    )
-    assert (
-        eval_spec.task_spec.metadata["quiz_bank_generation"]["stage_diagnostics"][
-            "generation"
-        ]["repair"]["repaired_question_count"]
-        == 1
-    )
-
-
-def test_quiz_generation_repairs_only_failed_subset():
+def test_generate_quiz_bank_repairs_only_failed_subset():
     responses = build_valid_quizbank_stage_responses()
     invalid_generation = dict(responses[2])
     invalid_questions = list(invalid_generation["questions"])
@@ -143,21 +77,15 @@ def test_quiz_generation_repairs_only_failed_subset():
         [responses[0], responses[1], invalid_generation, repair_payload]
     )
 
-    eval_spec = build_eval_spec(
-        PROMPT,
-        make_source_pack(),
-        quiz_bank_service=quiz_bank_service,
+    questions, metadata = quiz_bank_service.generate_quiz_bank(
+        task_spec=make_task_spec(),
+        source_pack=make_source_pack(),
     )
 
-    generation_diagnostics = eval_spec.task_spec.metadata["quiz_bank_generation"][
-        "stage_diagnostics"
-    ]["generation"]
-
-    assert len(eval_spec.slidesgenbench.quiz_bank) == 10
+    generation = metadata["stage_diagnostics"]["generation"]
+    assert len(questions) == 10
     assert len(llm_client.calls) == 4
-    assert generation_diagnostics["full_generation_invalid_count"] == 1
-    assert generation_diagnostics["repair"]["repaired_question_count"] == 1
-    assert (
-        generation_diagnostics["repaired_slots"][0]["question_id"] == "quiz_concept_01"
-    )
+    assert generation["full_generation_invalid_count"] == 1
+    assert generation["repair"]["repaired_question_count"] == 1
+    assert generation["repaired_slots"][0]["question_id"] == "quiz_qualitative_01"
     assert "Failed slots to repair" in llm_client.calls[-1]["user"]

@@ -296,10 +296,6 @@ def test_build_eval_spec_is_deterministic_and_complete(tmp_path):
         2,
         3,
     ]
-    assert {question.question_type for question in first.slidesgenbench.quiz_bank} == {
-        "concept",
-        "data",
-    }
 
 
 def test_inspection_extracts_supported_shape_kinds():

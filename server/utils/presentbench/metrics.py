@@ -11,7 +11,6 @@ from server.utils.reward_metrics import (
     normalize_text,
     slide_text_corpus,
     text_match_score,
-    tokenize,
 )
 from server.utils.reward_models import (
     ChecklistItem,
@@ -140,7 +139,7 @@ def _source_supported(text: str, task_spec: TaskSpec) -> bool:
         return True
     source_facts = task_spec.metadata.get("source_facts", [])
     for fact in source_facts:
-        if text_match_score(fact.get("text"), normalized) >= 0.6:
+        if text_match_score(fact.get("text"), text) >= 0.6:
             return True
     source_values = set(task_spec.metadata.get("source_values", []))
     numbers = set(extract_numbers(text))
@@ -288,11 +287,11 @@ def redundancy_score(
 ) -> float:
     if not previous_slides:
         return 0.0
-    slide_tokens = tokenize(slide_text_corpus(slide))
-    if not slide_tokens:
+    slide_text = slide_text_corpus(slide)
+    if not normalize_text(slide_text):
         return 0.0
     return max(
-        (len(slide_tokens & tokenize(slide_text_corpus(previous))) / len(slide_tokens))
+        text_match_score(slide_text_corpus(previous), slide_text)
         for previous in previous_slides
     )
 

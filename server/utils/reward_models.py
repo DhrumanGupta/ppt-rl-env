@@ -147,14 +147,6 @@ class ExtractedPresentation:
     metadata: dict[str, Any] = field(default_factory=dict)
 
 
-# TODO: Remove
-@dataclass(slots=True)
-class PresentationSemanticIndex:
-    slide_semantics: dict[int, dict[str, Any]] = field(default_factory=dict)
-    shape_semantics: dict[tuple[int, int], dict[str, Any]] = field(default_factory=dict)
-    metadata: dict[str, Any] = field(default_factory=dict)
-
-
 @dataclass(slots=True)
 class RequiredSlideSpec:
     slide_index: int
@@ -213,9 +205,9 @@ class QuizQuestion:
 
 
 @dataclass(slots=True)
-class QuizAnchor:
-    anchor_id: str
-    anchor_type: str
+class QuizEvidence:
+    evidence_id: str
+    evidence_type: str
     statement: str
     source_quote: str
     source_ref: str
@@ -225,40 +217,9 @@ class QuizAnchor:
 
 
 @dataclass(slots=True)
-class QuizContextChunk:
-    chunk_id: str
-    doc_id: str
-    title: str
-    page: int | None
-    source_ref: str
-    text: str
-
-
-@dataclass(slots=True)
-class QuizGenerationContext:
-    task_id: str
-    document_count: int
-    chunks: list[QuizContextChunk] = field(default_factory=list)
-    metadata: dict[str, Any] = field(default_factory=dict)
-
-
-@dataclass(slots=True)
-class ExtractionDraft:
-    quantitative_anchors: list[QuizAnchor] = field(default_factory=list)
-    qualitative_anchors: list[QuizAnchor] = field(default_factory=list)
-    metadata: dict[str, Any] = field(default_factory=dict)
-
-
-@dataclass(slots=True)
-class RefinedQuizEvidence:
-    quantitative_anchors: list[QuizAnchor] = field(default_factory=list)
-    qualitative_anchors: list[QuizAnchor] = field(default_factory=list)
-    metadata: dict[str, Any] = field(default_factory=dict)
-
-
-@dataclass(slots=True)
-class GeneratedQuizBankPayload:
-    questions: list[QuizQuestion] = field(default_factory=list)
+class QuizEvidenceBundle:
+    quantitative_evidence: list[QuizEvidence] = field(default_factory=list)
+    qualitative_evidence: list[QuizEvidence] = field(default_factory=list)
     metadata: dict[str, Any] = field(default_factory=dict)
 
 
@@ -361,17 +322,12 @@ __all__ = [
     "ExtractedShape",
     "ExtractedSlide",
     "ExtractedPresentation",
-    "PresentationSemanticIndex",
     "RequiredSlideSpec",
     "TaskSpec",
     "ChecklistItem",
     "QuizQuestion",
-    "QuizAnchor",
-    "QuizContextChunk",
-    "QuizGenerationContext",
-    "ExtractionDraft",
-    "RefinedQuizEvidence",
-    "GeneratedQuizBankPayload",
+    "QuizEvidence",
+    "QuizEvidenceBundle",
     "PresentBenchEvalSpec",
     "SlidesGenBenchEvalSpec",
     "EvalSpec",

@@ -5,7 +5,7 @@ import copy
 from server.utils.slidesgenbench.quizbank_service import SlidesGenQuizBankService
 
 
-class FakeStructuredLLMClient:
+class FakeLLMClient:
     def __init__(self, responses: list[dict]):
         self._responses = list(responses)
         self.calls: list[dict] = []
@@ -33,9 +33,9 @@ class FakeStructuredLLMClient:
 
 def build_valid_quizbank_stage_responses() -> list[dict]:
     extraction_payload = {
-        "quantitative_anchors": [
+        "quantitative_evidence": [
             {
-                "anchor_id": "data_01",
+                "evidence_id": "quantitative_01",
                 "statement": "Enterprise retention improved from 88% to 93%.",
                 "source_quote": "Enterprise retention improved from 88% to 93%.",
                 "source_ref": "memo",
@@ -44,7 +44,7 @@ def build_valid_quizbank_stage_responses() -> list[dict]:
                 "metadata": {"numbers": ["88%", "93%"]},
             },
             {
-                "anchor_id": "data_02",
+                "evidence_id": "quantitative_02",
                 "statement": "Guided automation reduced onboarding time by 35%.",
                 "source_quote": "Guided automation reduced onboarding time by 35%.",
                 "source_ref": "memo",
@@ -53,7 +53,7 @@ def build_valid_quizbank_stage_responses() -> list[dict]:
                 "metadata": {"numbers": ["35%"]},
             },
             {
-                "anchor_id": "data_03",
+                "evidence_id": "quantitative_03",
                 "statement": "Quarterly revenue targets are 18, 24, 28, and 32 million dollars.",
                 "source_quote": "Quarterly revenue targets are 18, 24, 28, and 32 million dollars.",
                 "source_ref": "memo",
@@ -62,7 +62,7 @@ def build_valid_quizbank_stage_responses() -> list[dict]:
                 "metadata": {"numbers": ["18", "24", "28", "32"]},
             },
             {
-                "anchor_id": "data_04",
+                "evidence_id": "quantitative_04",
                 "statement": "The memo lists a retention baseline of 88%.",
                 "source_quote": "Enterprise retention improved from 88% to 93%.",
                 "source_ref": "memo",
@@ -71,7 +71,7 @@ def build_valid_quizbank_stage_responses() -> list[dict]:
                 "metadata": {"numbers": ["88%"]},
             },
             {
-                "anchor_id": "data_05",
+                "evidence_id": "quantitative_05",
                 "statement": "The highest quarterly target mentioned is 32 million dollars.",
                 "source_quote": "Quarterly revenue targets are 18, 24, 28, and 32 million dollars.",
                 "source_ref": "memo",
@@ -80,9 +80,9 @@ def build_valid_quizbank_stage_responses() -> list[dict]:
                 "metadata": {"numbers": ["32"]},
             },
         ],
-        "qualitative_key_points": [
+        "qualitative_evidence": [
             {
-                "anchor_id": "concept_01",
+                "evidence_id": "qualitative_01",
                 "statement": "Northstar Growth Plan 2026 focuses on retention and onboarding.",
                 "source_quote": "Northstar Growth Plan 2026 focuses on retention and onboarding.",
                 "source_ref": "memo",
@@ -91,7 +91,7 @@ def build_valid_quizbank_stage_responses() -> list[dict]:
                 "metadata": {},
             },
             {
-                "anchor_id": "concept_02",
+                "evidence_id": "qualitative_02",
                 "statement": "Enterprise retention improved from 88% to 93%.",
                 "source_quote": "Enterprise retention improved from 88% to 93%.",
                 "source_ref": "memo",
@@ -100,7 +100,7 @@ def build_valid_quizbank_stage_responses() -> list[dict]:
                 "metadata": {},
             },
             {
-                "anchor_id": "concept_03",
+                "evidence_id": "qualitative_03",
                 "statement": "Guided automation reduced onboarding time by 35%.",
                 "source_quote": "Guided automation reduced onboarding time by 35%.",
                 "source_ref": "memo",
@@ -109,7 +109,7 @@ def build_valid_quizbank_stage_responses() -> list[dict]:
                 "metadata": {},
             },
             {
-                "anchor_id": "concept_04",
+                "evidence_id": "qualitative_04",
                 "statement": "Quarterly revenue targets are 18, 24, 28, and 32 million dollars.",
                 "source_quote": "Quarterly revenue targets are 18, 24, 28, and 32 million dollars.",
                 "source_ref": "memo",
@@ -118,7 +118,7 @@ def build_valid_quizbank_stage_responses() -> list[dict]:
                 "metadata": {},
             },
             {
-                "anchor_id": "concept_05",
+                "evidence_id": "qualitative_05",
                 "statement": "The plan memo emphasizes measurable operational improvements.",
                 "source_quote": "Northstar Growth Plan 2026 focuses on retention and onboarding.",
                 "source_ref": "memo",
@@ -131,16 +131,16 @@ def build_valid_quizbank_stage_responses() -> list[dict]:
     }
 
     refinement_payload = {
-        "quantitative_anchors": extraction_payload["quantitative_anchors"],
-        "qualitative_anchors": extraction_payload["qualitative_key_points"],
+        "quantitative_evidence": extraction_payload["quantitative_evidence"],
+        "qualitative_evidence": extraction_payload["qualitative_evidence"],
         "metadata": {"stage": "refinement"},
     }
 
     generation_payload = {
         "questions": [
             {
-                "question_id": "quiz_concept_01",
-                "question_type": "concept",
+                "question_id": "quiz_qualitative_01",
+                "question_type": "qualitative",
                 "question": "Which statement best reflects the memo's main focus?",
                 "options": [
                     "Northstar Growth Plan 2026 focuses on retention and onboarding.",
@@ -156,8 +156,8 @@ def build_valid_quizbank_stage_responses() -> list[dict]:
                 ],
             },
             {
-                "question_id": "quiz_concept_02",
-                "question_type": "concept",
+                "question_id": "quiz_qualitative_02",
+                "question_type": "qualitative",
                 "question": "Which outcome is explicitly supported by the memo?",
                 "options": [
                     "Enterprise retention improved from 88% to 93%.",
@@ -171,8 +171,8 @@ def build_valid_quizbank_stage_responses() -> list[dict]:
                 "source_quotes": ["Enterprise retention improved from 88% to 93%."],
             },
             {
-                "question_id": "quiz_concept_03",
-                "question_type": "concept",
+                "question_id": "quiz_qualitative_03",
+                "question_type": "qualitative",
                 "question": "What operational change does the memo attribute to guided automation?",
                 "options": [
                     "Guided automation reduced onboarding time by 35%.",
@@ -186,8 +186,8 @@ def build_valid_quizbank_stage_responses() -> list[dict]:
                 "source_quotes": ["Guided automation reduced onboarding time by 35%."],
             },
             {
-                "question_id": "quiz_concept_04",
-                "question_type": "concept",
+                "question_id": "quiz_qualitative_04",
+                "question_type": "qualitative",
                 "question": "Which statement about quarterly revenue targets is supported?",
                 "options": [
                     "Quarterly revenue targets are 18, 24, 28, and 32 million dollars.",
@@ -203,8 +203,8 @@ def build_valid_quizbank_stage_responses() -> list[dict]:
                 ],
             },
             {
-                "question_id": "quiz_concept_05",
-                "question_type": "concept",
+                "question_id": "quiz_qualitative_05",
+                "question_type": "qualitative",
                 "question": "Which high-level theme is grounded in the source?",
                 "options": [
                     "The plan memo emphasizes measurable operational improvements.",
@@ -220,8 +220,8 @@ def build_valid_quizbank_stage_responses() -> list[dict]:
                 ],
             },
             {
-                "question_id": "quiz_data_01",
-                "question_type": "data",
+                "question_id": "quiz_quantitative_01",
+                "question_type": "quantitative",
                 "question": "What retention rate did the memo report after improvement?",
                 "options": ["93%", "90%", "95%", "98%"],
                 "correct_answer": "93%",
@@ -230,8 +230,8 @@ def build_valid_quizbank_stage_responses() -> list[dict]:
                 "source_quotes": ["Enterprise retention improved from 88% to 93%."],
             },
             {
-                "question_id": "quiz_data_02",
-                "question_type": "data",
+                "question_id": "quiz_quantitative_02",
+                "question_type": "quantitative",
                 "question": "By what percentage did guided automation reduce onboarding time?",
                 "options": ["35%", "20%", "25%", "40%"],
                 "correct_answer": "35%",
@@ -240,8 +240,8 @@ def build_valid_quizbank_stage_responses() -> list[dict]:
                 "source_quotes": ["Guided automation reduced onboarding time by 35%."],
             },
             {
-                "question_id": "quiz_data_03",
-                "question_type": "data",
+                "question_id": "quiz_quantitative_03",
+                "question_type": "quantitative",
                 "question": "What was the starting retention rate before the improvement?",
                 "options": ["88%", "82%", "91%", "96%"],
                 "correct_answer": "88%",
@@ -250,8 +250,8 @@ def build_valid_quizbank_stage_responses() -> list[dict]:
                 "source_quotes": ["Enterprise retention improved from 88% to 93%."],
             },
             {
-                "question_id": "quiz_data_04",
-                "question_type": "data",
+                "question_id": "quiz_quantitative_04",
+                "question_type": "quantitative",
                 "question": "Which quarterly revenue target appears first in the memo's list?",
                 "options": ["18", "16", "20", "22"],
                 "correct_answer": "18",
@@ -262,8 +262,8 @@ def build_valid_quizbank_stage_responses() -> list[dict]:
                 ],
             },
             {
-                "question_id": "quiz_data_05",
-                "question_type": "data",
+                "question_id": "quiz_quantitative_05",
+                "question_type": "quantitative",
                 "question": "What is the highest quarterly revenue target named in the memo?",
                 "options": ["32", "28", "24", "36"],
                 "correct_answer": "32",
@@ -282,8 +282,6 @@ def build_valid_quizbank_stage_responses() -> list[dict]:
 
 def make_quizbank_service(
     responses: list[dict] | None = None,
-) -> tuple[SlidesGenQuizBankService, FakeStructuredLLMClient]:
-    client = FakeStructuredLLMClient(
-        responses or build_valid_quizbank_stage_responses()
-    )
+) -> tuple[SlidesGenQuizBankService, FakeLLMClient]:
+    client = FakeLLMClient(responses or build_valid_quizbank_stage_responses())
     return SlidesGenQuizBankService(client), client

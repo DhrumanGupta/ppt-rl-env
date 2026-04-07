@@ -18,7 +18,6 @@ from server.utils.reward_metrics import clamp
 from server.utils.reward_models import (
     EvalSpec,
     IntermediateSlideRewardResult,
-    PresentationSemanticIndex,
     RewardResult,
     ExtractedSlide,
     SourcePack,
@@ -150,7 +149,6 @@ def evaluate_presentation(
     presentation: PptxEditor | PptxPresentation | str,
     *,
     use_mllm: bool = False,
-    presentation_semantics: PresentationSemanticIndex | None = None,
     judge: Any | None = None,
     render_service: Any | None = None,
     inspection_service: PptxExtractionService | None = None,
@@ -161,10 +159,7 @@ def evaluate_presentation(
     inspection_service = inspection_service or PptxExtractionService()
 
     try:
-        presentation_extraction = inspection_service.inspect_presentation(
-            presentation,
-            presentation_semantics=presentation_semantics,
-        )
+        presentation_extraction = inspection_service.inspect_presentation(presentation)
     except Exception as error:
         return _reward_result_for_failure(eval_spec, error=error, mode=mode)
 
@@ -232,7 +227,6 @@ def evaluate_slide(
     *,
     presentation: PptxEditor | PptxPresentation | None = None,
     slide_extraction: ExtractedSlide | None = None,
-    presentation_semantics: PresentationSemanticIndex | None = None,
     use_mllm: bool = False,
     judge: Any | None = None,
     render_service: Any | None = None,
@@ -250,7 +244,6 @@ def evaluate_slide(
             slide_extraction = inspection_service.inspect_slide(
                 slide_index,
                 presentation=presentation,
-                presentation_semantics=presentation_semantics,
             )
     except Exception as error:
         return IntermediateSlideRewardResult(
@@ -297,7 +290,6 @@ def compute_presentation_reward(
     *,
     task_constraints: TaskConstraints | None = None,
     use_mllm: bool = False,
-    presentation_semantics: PresentationSemanticIndex | None = None,
     judge: Any | None = None,
     render_service: Any | None = None,
     inspection_service: PptxExtractionService | None = None,
@@ -318,7 +310,6 @@ def compute_presentation_reward(
         eval_spec,
         presentation,
         use_mllm=use_mllm,
-        presentation_semantics=presentation_semantics,
         judge=judge,
         render_service=render_service,
         inspection_service=inspection_service,
@@ -334,7 +325,6 @@ def compute_intermediate_slide_reward(
     slide_index: int,
     presentation: PptxEditor | PptxPresentation | None = None,
     slide_extraction: ExtractedSlide | None = None,
-    presentation_semantics: PresentationSemanticIndex | None = None,
     task_constraints: TaskConstraints | None = None,
     use_mllm: bool = False,
     judge: Any | None = None,
@@ -359,7 +349,6 @@ def compute_intermediate_slide_reward(
         slide_index,
         presentation=presentation,
         slide_extraction=slide_extraction,
-        presentation_semantics=presentation_semantics,
         use_mllm=use_mllm,
         judge=judge,
         render_service=render_service,

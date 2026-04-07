@@ -1,27 +1,21 @@
 from __future__ import annotations
 
+import os
 import re
+from functools import lru_cache
 from typing import Any
+
+import numpy as np
 
 from server.utils.reward_models import ExtractedPresentation, ExtractedSlide
 
 
-_WORD_PATTERN = re.compile(r"[a-z0-9%]+")
 _NUMBER_PATTERN = re.compile(r"\b\d+(?:\.\d+)?%?\b")
-_STOPWORDS = {
-    "a",
-    "an",
-    "and",
-    "for",
-    "in",
-    "is",
-    "of",
-    "on",
-    "or",
-    "the",
-    "to",
-    "with",
-}
+_TEXT_UNIT_SPLIT_PATTERN = re.compile(r"(?<=[.!?])\s+|\n+")
+_DEFAULT_SENTENCE_MODEL = os.environ.get(
+    "SENTENCE_TRANSFORMER_MODEL",
+    "sentence-transformers/all-MiniLM-L6-v2",
+)
 
 
 def clamp(value: float, low: float = 0.0, high: float = 1.0) -> float:
@@ -34,12 +28,22 @@ def normalize_text(text: str | None) -> str:
     return re.sub(r"\s+", " ", text).strip().lower()
 
 
-def tokenize(text: str | None) -> set[str]:
-    return {
-        token
-        for token in _WORD_PATTERN.findall(normalize_text(text))
-        if token not in _STOPWORDS
-    }
+def _similarity_units(text: str | None) -> list[str]:
+    if not text:
+        return []
+    units = [
+        segment.strip()
+        for segment in _TEXT_UNIT_SPLIT_PATTERN.split(text)
+        if segment.strip()
+    ]
+    return units or [text.strip()]
+
+
+@lru_cache(maxsize=1)
+def _similarity_model():
+    from sentence_transformers import SentenceTransformer
+
+    return SentenceTransformer(_DEFAULT_SENTENCE_MODEL)
 
 
 def extract_numbers(text: str | None) -> list[str]:
@@ -55,12 +59,18 @@ def text_match_score(candidate: str | None, requirement: str | None) -> float:
     requirement_norm = normalize_text(requirement)
     if requirement_norm in candidate_norm:
         return 1.0
-    candidate_tokens = tokenize(candidate_norm)
-    requirement_tokens = tokenize(requirement_norm)
-    if not requirement_tokens:
+    candidate_units = _similarity_units(candidate)
+    if not candidate_units or not requirement_norm:
         return 0.0
-    overlap = candidate_tokens & requirement_tokens
-    return len(overlap) / len(requirement_tokens)
+    model = _similarity_model()
+    embeddings = model.encode(
+        [*candidate_units, requirement],
+        convert_to_numpy=True,
+        normalize_embeddings=True,
+    )
+    requirement_embedding = embeddings[-1]
+    candidate_embeddings = embeddings[:-1]
+    return max(0.0, float(np.max(candidate_embeddings @ requirement_embedding)))
 
 
 def slide_text_corpus(slide: ExtractedSlide) -> str:
@@ -129,5 +139,4 @@ __all__ = [
     "normalize_text",
     "slide_text_corpus",
     "text_match_score",
-    "tokenize",
 ]

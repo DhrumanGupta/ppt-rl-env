@@ -14,7 +14,7 @@ from server.utils.slidesgenbench.quizbank_service import QuizBankGenerationServi
 SPEC_VERSION = "1.0"
 
 DEFAULT_SLIDESGENBENCH_SCORING_CONFIG = {
-    "quiz_split": {"concept": 0.5, "data": 0.5},
+    "quiz_split": {"qualitative": 0.5, "quantitative": 0.5},
 }
 
 

@@ -19,21 +19,21 @@ def score_slidesgenbench(
         slide_text_corpus(slide) for slide in presentation_extraction.slides
     )
     quiz_results: list[dict[str, object]] = []
-    concept_correct = 0
-    concept_total = 0
-    data_correct = 0
-    data_total = 0
+    qualitative_correct = 0
+    qualitative_total = 0
+    quantitative_correct = 0
+    quantitative_total = 0
 
     for question in eval_spec.quiz_bank:
         correct = False
-        if question.question_type == "data":
-            data_total += 1
+        if question.question_type == "quantitative":
+            quantitative_total += 1
             correct = question.correct_answer in deck_text
-            data_correct += int(correct)
+            quantitative_correct += int(correct)
         else:
-            concept_total += 1
+            qualitative_total += 1
             correct = text_match_score(deck_text, question.correct_answer) >= 0.6
-            concept_correct += int(correct)
+            qualitative_correct += int(correct)
         quiz_results.append(
             {
                 "question_id": question.question_id,
@@ -44,22 +44,26 @@ def score_slidesgenbench(
             }
         )
 
-    s_quiz_concept = (concept_correct / concept_total) if concept_total else 0.0
-    s_quiz_data = (data_correct / data_total) if data_total else 0.0
+    s_quiz_qualitative = (
+        (qualitative_correct / qualitative_total) if qualitative_total else 0.0
+    )
+    s_quiz_quantitative = (
+        (quantitative_correct / quantitative_total) if quantitative_total else 0.0
+    )
     quiz_split = eval_spec.scoring_config.get(
-        "quiz_split", {"concept": 0.5, "data": 0.5}
+        "quiz_split", {"qualitative": 0.5, "quantitative": 0.5}
     )
     s_quiz = (
-        quiz_split.get("concept", 0.5) * s_quiz_concept
-        + quiz_split.get("data", 0.5) * s_quiz_data
+        quiz_split.get("qualitative", 0.5) * s_quiz_qualitative
+        + quiz_split.get("quantitative", 0.5) * s_quiz_quantitative
     )
     return SlidesGenBenchScoreResult(
         reward_total=s_quiz,
         reward_breakdown={
             "R_sg": s_quiz,
             "S_quiz": s_quiz,
-            "S_quiz_concept": s_quiz_concept,
-            "S_quiz_data": s_quiz_data,
+            "S_quiz_qualitative": s_quiz_qualitative,
+            "S_quiz_quantitative": s_quiz_quantitative,
         },
         quiz_results=quiz_results,
         metadata={

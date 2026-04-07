@@ -5,35 +5,23 @@ from typing import Any, Protocol
 
 from server.llm_client import LLMClient
 from server.utils.reward_models import (
-    ExtractionDraft,
-    GeneratedQuizBankPayload,
-    QuizAnchor,
+    QuizEvidence,
+    QuizEvidenceBundle,
     QuizQuestion,
-    RefinedQuizEvidence,
     SourcePack,
     TaskSpec,
     to_serializable,
 )
 from server.utils.slidesgenbench.prompts import (
     build_quiz_extraction_prompts,
-    build_quiz_generation_context,
     build_quiz_generation_prompts,
-    build_quiz_regeneration_prompts,
     build_quiz_refinement_prompts,
+    build_quiz_regeneration_prompts,
+    build_quiz_source_context,
 )
 
 _NUMBER_PATTERN = re.compile(r"\b\d+(?:\.\d+)?%?\b")
 _WHITESPACE_PATTERN = re.compile(r"\s+")
-
-
-class StructuredQuizLLMClient(Protocol):
-    def chat_json(
-        self,
-        system: str,
-        user: str,
-        temperature: float = 0.3,
-        max_tokens: int = 1024,
-    ) -> dict[str, Any]: ...
 
 
 class QuizBankGenerationService(Protocol):
@@ -56,15 +44,19 @@ def _source_ref(doc_id: str, page: int | None) -> str:
     return f"{doc_id}:p{page}" if page is not None else doc_id
 
 
-def _unique_anchors(anchors: list[QuizAnchor]) -> list[QuizAnchor]:
+def _unique_evidence(items: list[QuizEvidence]) -> list[QuizEvidence]:
     seen: set[tuple[str, str, str]] = set()
-    unique: list[QuizAnchor] = []
-    for anchor in anchors:
-        key = (anchor.anchor_type, anchor.source_ref.lower(), anchor.statement.lower())
+    unique: list[QuizEvidence] = []
+    for item in items:
+        key = (
+            item.evidence_type,
+            item.source_ref.lower(),
+            item.statement.lower(),
+        )
         if key in seen:
             continue
         seen.add(key)
-        unique.append(anchor)
+        unique.append(item)
     return unique
 
 
@@ -98,9 +90,9 @@ def _require_string(raw: dict[str, Any], key: str) -> str:
     return value.strip()
 
 
-def _parse_anchor(raw: Any, *, expected_type: str, default_id: str) -> QuizAnchor:
+def _parse_evidence(raw: Any, *, expected_type: str, default_id: str) -> QuizEvidence:
     if not isinstance(raw, dict):
-        raise ValueError("anchor entry must be an object")
+        raise ValueError("evidence entry must be an object")
     doc_id = _require_string(raw, "doc_id")
     page = _coerce_page(raw.get("page"))
     source_ref = raw.get("source_ref") or _source_ref(doc_id, page)
@@ -110,11 +102,11 @@ def _parse_anchor(raw: Any, *, expected_type: str, default_id: str) -> QuizAncho
     if metadata is None:
         metadata = {}
     if not isinstance(metadata, dict):
-        raise ValueError("anchor metadata must be an object")
+        raise ValueError("evidence metadata must be an object")
 
-    return QuizAnchor(
-        anchor_id=str(raw.get("anchor_id") or default_id),
-        anchor_type=expected_type,
+    return QuizEvidence(
+        evidence_id=str(raw.get("evidence_id") or default_id),
+        evidence_type=expected_type,
         statement=_require_string(raw, "statement"),
         source_quote=_require_string(raw, "source_quote"),
         source_ref=source_ref.strip(),
@@ -124,51 +116,29 @@ def _parse_anchor(raw: Any, *, expected_type: str, default_id: str) -> QuizAncho
     )
 
 
-def _parse_extraction_payload(payload: dict[str, Any]) -> ExtractionDraft:
+def _parse_evidence_bundle(payload: dict[str, Any]) -> QuizEvidenceBundle:
     quantitative = [
-        _parse_anchor(raw, expected_type="data", default_id=f"data_{index:02d}")
-        for index, raw in enumerate(
-            _require_list(payload, "quantitative_anchors"), start=1
+        _parse_evidence(
+            raw, expected_type="quantitative", default_id=f"quantitative_{index:02d}"
         )
-    ]
-    qualitative_key = (
-        "qualitative_key_points"
-        if "qualitative_key_points" in payload
-        else "qualitative_anchors"
-    )
-    qualitative = [
-        _parse_anchor(raw, expected_type="concept", default_id=f"concept_{index:02d}")
-        for index, raw in enumerate(_require_list(payload, qualitative_key), start=1)
-    ]
-    metadata = (
-        payload.get("metadata") if isinstance(payload.get("metadata"), dict) else {}
-    )
-    return ExtractionDraft(
-        quantitative_anchors=_unique_anchors(quantitative),
-        qualitative_anchors=_unique_anchors(qualitative),
-        metadata=metadata,
-    )
-
-
-def _parse_refined_payload(payload: dict[str, Any]) -> RefinedQuizEvidence:
-    quantitative = [
-        _parse_anchor(raw, expected_type="data", default_id=f"data_{index:02d}")
         for index, raw in enumerate(
-            _require_list(payload, "quantitative_anchors"), start=1
+            _require_list(payload, "quantitative_evidence"), start=1
         )
     ]
     qualitative = [
-        _parse_anchor(raw, expected_type="concept", default_id=f"concept_{index:02d}")
+        _parse_evidence(
+            raw, expected_type="qualitative", default_id=f"qualitative_{index:02d}"
+        )
         for index, raw in enumerate(
-            _require_list(payload, "qualitative_anchors"), start=1
+            _require_list(payload, "qualitative_evidence"), start=1
         )
     ]
     metadata = (
         payload.get("metadata") if isinstance(payload.get("metadata"), dict) else {}
     )
-    return RefinedQuizEvidence(
-        quantitative_anchors=_unique_anchors(quantitative),
-        qualitative_anchors=_unique_anchors(qualitative),
+    return QuizEvidenceBundle(
+        quantitative_evidence=_unique_evidence(quantitative),
+        qualitative_evidence=_unique_evidence(qualitative),
         metadata=metadata,
     )
 
@@ -215,10 +185,10 @@ def _question_slot(question_id: str, question_type: str) -> dict[str, str]:
 class SlidesGenQuizBankService:
     def __init__(
         self,
-        llm_client: StructuredQuizLLMClient | LLMClient,
+        llm_client: LLMClient,
         *,
         max_attempts: int = 2,
-        max_chunk_chars: int = 1200,
+        max_source_section_chars: int = 1200,
     ):
         if llm_client is None:
             raise ValueError("SlidesGenQuizBankService requires an llm_client")
@@ -226,7 +196,7 @@ class SlidesGenQuizBankService:
             raise ValueError("max_attempts must be at least 1")
         self.llm_client = llm_client
         self.max_attempts = max_attempts
-        self.max_chunk_chars = max_chunk_chars
+        self.max_source_section_chars = max_source_section_chars
 
     def generate_quiz_bank(
         self,
@@ -235,53 +205,59 @@ class SlidesGenQuizBankService:
         source_pack: SourcePack,
         mode: str = "eval",
     ) -> tuple[list[QuizQuestion], dict[str, Any]]:
-        source_context = build_quiz_generation_context(
-            source_pack, max_chunk_chars=self.max_chunk_chars
+        source_context, source_section_count = build_quiz_source_context(
+            source_pack,
+            max_source_section_chars=self.max_source_section_chars,
         )
-        draft_bundle, draft_diagnostics = self._extract_source_truth(
+        extracted_evidence, extraction_diagnostics = self._extract_evidence(
             task_spec, source_context
         )
-        refined_bundle, refine_diagnostics = self._verify_and_refine(
-            task_spec, source_pack, source_context, draft_bundle
+        verified_evidence, refinement_diagnostics = self._refine_evidence(
+            task_spec,
+            source_pack,
+            source_context,
+            extracted_evidence,
         )
 
         target_total = max(2, self._target_question_count(source_pack, mode=mode))
-        concept_target = max(1, target_total // 2)
-        data_target = max(1, target_total - concept_target)
-        quiz_payload, generation_diagnostics = self._generate_mcqs(
+        qualitative_target = max(1, target_total // 2)
+        quantitative_target = max(1, target_total - qualitative_target)
+        questions, generation_diagnostics = self._generate_questions(
             task_spec,
-            refined_bundle,
+            verified_evidence,
             target_total=target_total,
-            concept_target=concept_target,
-            data_target=data_target,
+            qualitative_target=qualitative_target,
+            quantitative_target=quantitative_target,
         )
 
         metadata = {
             "service_name": self.__class__.__name__,
             "generation_mode": "llm_source_grounded",
             "llm_client_type": self.llm_client.__class__.__name__,
-            "source_chunk_count": len(source_context.chunks),
-            "draft_quantitative_anchor_count": len(draft_bundle.quantitative_anchors),
-            "draft_qualitative_anchor_count": len(draft_bundle.qualitative_anchors),
-            "verified_quantitative_anchor_count": len(
-                refined_bundle.quantitative_anchors
+            "source_section_count": source_section_count,
+            "draft_quantitative_evidence_count": len(
+                extracted_evidence.quantitative_evidence
             ),
-            "verified_qualitative_anchor_count": len(
-                refined_bundle.qualitative_anchors
+            "draft_qualitative_evidence_count": len(
+                extracted_evidence.qualitative_evidence
             ),
-            "question_count": len(quiz_payload.questions),
+            "verified_quantitative_evidence_count": len(
+                verified_evidence.quantitative_evidence
+            ),
+            "verified_qualitative_evidence_count": len(
+                verified_evidence.qualitative_evidence
+            ),
+            "question_count": len(questions),
             "question_types": sorted(
-                {question.question_type for question in quiz_payload.questions}
+                {question.question_type for question in questions}
             ),
             "stage_diagnostics": {
-                "extraction": draft_diagnostics,
-                "refinement": refine_diagnostics,
+                "extraction": extraction_diagnostics,
+                "refinement": refinement_diagnostics,
                 "generation": generation_diagnostics,
             },
         }
-        if quiz_payload.metadata:
-            metadata["generation_metadata"] = quiz_payload.metadata
-        return quiz_payload.questions, metadata
+        return questions, metadata
 
     def _call_stage_json(
         self,
@@ -306,11 +282,11 @@ class SlidesGenQuizBankService:
             f"{stage_name} failed after {self.max_attempts} attempt(s): {last_error}"
         )
 
-    def _extract_source_truth(
+    def _extract_evidence(
         self,
         task_spec: TaskSpec,
-        source_context,
-    ) -> tuple[ExtractionDraft, dict[str, Any]]:
+        source_context: str,
+    ) -> tuple[QuizEvidenceBundle, dict[str, Any]]:
         system_prompt, user_prompt = build_quiz_extraction_prompts(
             task_spec, source_context
         )
@@ -320,43 +296,50 @@ class SlidesGenQuizBankService:
             user_prompt=user_prompt,
             max_tokens=3000,
         )
-        draft = _parse_extraction_payload(payload)
-        if not draft.qualitative_anchors:
-            raise ValueError("quiz_extraction returned no qualitative anchors")
+        evidence_bundle = _parse_evidence_bundle(payload)
+        if not evidence_bundle.qualitative_evidence:
+            raise ValueError("quiz_extraction returned no qualitative evidence")
         diagnostics.update(
             {
-                "quantitative_anchor_count": len(draft.quantitative_anchors),
-                "qualitative_anchor_count": len(draft.qualitative_anchors),
+                "quantitative_evidence_count": len(
+                    evidence_bundle.quantitative_evidence
+                ),
+                "qualitative_evidence_count": len(evidence_bundle.qualitative_evidence),
             }
         )
-        return draft, diagnostics
+        return evidence_bundle, diagnostics
 
-    def _verify_anchor(
-        self, anchor: QuizAnchor, *, source_texts: dict[str, str]
+    def _verify_evidence(
+        self,
+        evidence: QuizEvidence,
+        *,
+        source_texts: dict[str, str],
     ) -> bool:
-        source_text = source_texts.get(anchor.doc_id, "")
+        source_text = source_texts.get(evidence.doc_id, "")
         if not source_text:
             return False
-        expected_ref = _source_ref(anchor.doc_id, anchor.page)
-        if anchor.source_ref != expected_ref:
+        expected_ref = _source_ref(evidence.doc_id, evidence.page)
+        if evidence.source_ref != expected_ref:
             return False
-        if _normalize_text(anchor.source_quote) not in source_text:
+        if _normalize_text(evidence.source_quote) not in source_text:
             return False
-        if anchor.anchor_type == "data" and not _NUMBER_PATTERN.search(
-            f"{anchor.statement} {anchor.source_quote}"
+        if evidence.evidence_type == "quantitative" and not _NUMBER_PATTERN.search(
+            f"{evidence.statement} {evidence.source_quote}"
         ):
             return False
         return True
 
-    def _verify_and_refine(
+    def _refine_evidence(
         self,
         task_spec: TaskSpec,
         source_pack: SourcePack,
-        source_context,
-        draft_bundle: ExtractionDraft,
-    ) -> tuple[RefinedQuizEvidence, dict[str, Any]]:
+        source_context: str,
+        evidence_bundle: QuizEvidenceBundle,
+    ) -> tuple[QuizEvidenceBundle, dict[str, Any]]:
         system_prompt, user_prompt = build_quiz_refinement_prompts(
-            task_spec, source_context, draft_bundle
+            task_spec,
+            source_context,
+            evidence_bundle,
         )
         payload, diagnostics = self._call_stage_json(
             stage_name="quiz_refinement",
@@ -364,52 +347,61 @@ class SlidesGenQuizBankService:
             user_prompt=user_prompt,
             max_tokens=3000,
         )
-        candidate_bundle = _parse_refined_payload(payload)
+        candidate_bundle = _parse_evidence_bundle(payload)
         source_texts = _document_source_texts(source_pack)
         verified_quantitative = [
-            anchor
-            for anchor in candidate_bundle.quantitative_anchors
-            if self._verify_anchor(anchor, source_texts=source_texts)
+            evidence
+            for evidence in candidate_bundle.quantitative_evidence
+            if self._verify_evidence(evidence, source_texts=source_texts)
         ]
         verified_qualitative = [
-            anchor
-            for anchor in candidate_bundle.qualitative_anchors
-            if self._verify_anchor(anchor, source_texts=source_texts)
+            evidence
+            for evidence in candidate_bundle.qualitative_evidence
+            if self._verify_evidence(evidence, source_texts=source_texts)
         ]
 
-        refined = RefinedQuizEvidence(
-            quantitative_anchors=_unique_anchors(verified_quantitative),
-            qualitative_anchors=_unique_anchors(verified_qualitative),
+        verified_bundle = QuizEvidenceBundle(
+            quantitative_evidence=_unique_evidence(verified_quantitative),
+            qualitative_evidence=_unique_evidence(verified_qualitative),
             metadata=candidate_bundle.metadata,
         )
-        if not refined.qualitative_anchors:
-            raise ValueError("quiz_refinement returned no verified qualitative anchors")
-        if task_spec.require_quantitative_content and not refined.quantitative_anchors:
+        if not verified_bundle.qualitative_evidence:
             raise ValueError(
-                "quiz_refinement returned no verified quantitative anchors"
+                "quiz_refinement returned no verified qualitative evidence"
+            )
+        if (
+            task_spec.require_quantitative_content
+            and not verified_bundle.quantitative_evidence
+        ):
+            raise ValueError(
+                "quiz_refinement returned no verified quantitative evidence"
             )
 
         diagnostics.update(
             {
-                "verified_quantitative_anchor_count": len(refined.quantitative_anchors),
-                "verified_qualitative_anchor_count": len(refined.qualitative_anchors),
+                "verified_quantitative_evidence_count": len(
+                    verified_bundle.quantitative_evidence
+                ),
+                "verified_qualitative_evidence_count": len(
+                    verified_bundle.qualitative_evidence
+                ),
             }
         )
-        return refined, diagnostics
+        return verified_bundle, diagnostics
 
     def _validate_question(
         self,
         question: QuizQuestion,
         *,
-        evidence: RefinedQuizEvidence,
+        evidence_bundle: QuizEvidenceBundle,
         expected_type: str | None = None,
     ) -> None:
         if expected_type is not None and question.question_type != expected_type:
             raise ValueError(
                 f"question_type must be {expected_type} for question {question.question_id}"
             )
-        if question.question_type not in {"concept", "data"}:
-            raise ValueError("question_type must be concept or data")
+        if question.question_type not in {"qualitative", "quantitative"}:
+            raise ValueError("question_type must be qualitative or quantitative")
         if len(question.options) != 4:
             raise ValueError("each question must have exactly 4 options")
         if len({option.lower() for option in question.options}) != 4:
@@ -419,35 +411,35 @@ class SlidesGenQuizBankService:
         if not any(ref in question.explanation for ref in question.source_refs):
             raise ValueError("explanation must mention at least one source_ref")
 
-        valid_refs = {
-            anchor.source_ref
-            for anchor in evidence.qualitative_anchors + evidence.quantitative_anchors
-        }
-        valid_quotes = {
-            _normalize_text(anchor.source_quote)
-            for anchor in evidence.qualitative_anchors + evidence.quantitative_anchors
-        }
+        all_evidence = (
+            evidence_bundle.qualitative_evidence + evidence_bundle.quantitative_evidence
+        )
+        valid_refs = {item.source_ref for item in all_evidence}
+        valid_quotes = {_normalize_text(item.source_quote) for item in all_evidence}
         if not set(question.source_refs).issubset(valid_refs):
             raise ValueError("question source_refs must come from verified evidence")
         if not {_normalize_text(quote) for quote in question.source_quotes}.issubset(
             valid_quotes
         ):
             raise ValueError("question source_quotes must come from verified evidence")
-        if question.question_type == "data" and not _NUMBER_PATTERN.search(
+        if question.question_type == "quantitative" and not _NUMBER_PATTERN.search(
             question.correct_answer
         ):
-            raise ValueError("data questions must use a numeric correct answer")
+            raise ValueError("quantitative questions must use a numeric correct answer")
 
     def _build_question_slots(
-        self, *, concept_target: int, data_target: int
+        self,
+        *,
+        qualitative_target: int,
+        quantitative_target: int,
     ) -> list[dict[str, str]]:
         slots = [
-            _question_slot(f"quiz_concept_{index:02d}", "concept")
-            for index in range(1, concept_target + 1)
+            _question_slot(f"quiz_qualitative_{index:02d}", "qualitative")
+            for index in range(1, qualitative_target + 1)
         ]
         slots.extend(
-            _question_slot(f"quiz_data_{index:02d}", "data")
-            for index in range(1, data_target + 1)
+            _question_slot(f"quiz_quantitative_{index:02d}", "quantitative")
+            for index in range(1, quantitative_target + 1)
         )
         return slots
 
@@ -461,7 +453,7 @@ class SlidesGenQuizBankService:
         self,
         questions: list[QuizQuestion],
         *,
-        evidence: RefinedQuizEvidence,
+        evidence_bundle: QuizEvidenceBundle,
         expected_slots: list[dict[str, str]],
     ) -> tuple[list[QuizQuestion], list[dict[str, Any]], list[str]]:
         expected_by_id = {
@@ -490,7 +482,9 @@ class SlidesGenQuizBankService:
                 continue
             try:
                 self._validate_question(
-                    question, evidence=evidence, expected_type=expected_type
+                    question,
+                    evidence_bundle=evidence_bundle,
+                    expected_type=expected_type,
                 )
                 valid_questions.append(question)
             except Exception as error:
@@ -520,7 +514,10 @@ class SlidesGenQuizBankService:
         return valid_questions, failures, extra_question_ids
 
     def _merge_questions_by_slot(
-        self, *, questions: list[QuizQuestion], expected_slots: list[dict[str, str]]
+        self,
+        *,
+        questions: list[QuizQuestion],
+        expected_slots: list[dict[str, str]],
     ) -> list[QuizQuestion]:
         by_id = {question.question_id: question for question in questions}
         return [by_id[slot["question_id"]] for slot in expected_slots]
@@ -529,7 +526,7 @@ class SlidesGenQuizBankService:
         self,
         *,
         task_spec: TaskSpec,
-        evidence_bundle: RefinedQuizEvidence,
+        evidence_bundle: QuizEvidenceBundle,
         failed_slots: list[dict[str, Any]],
         preserved_questions: list[QuizQuestion],
     ) -> tuple[list[QuizQuestion], dict[str, Any]]:
@@ -553,7 +550,7 @@ class SlidesGenQuizBankService:
         valid_repaired, repair_failures, extra_question_ids = (
             self._validate_question_collection(
                 repaired_questions,
-                evidence=evidence_bundle,
+                evidence_bundle=evidence_bundle,
                 expected_slots=expected_slots,
             )
         )
@@ -570,24 +567,25 @@ class SlidesGenQuizBankService:
         diagnostics["repaired_question_count"] = len(valid_repaired)
         return valid_repaired, diagnostics
 
-    def _generate_mcqs(
+    def _generate_questions(
         self,
         task_spec: TaskSpec,
-        evidence_bundle: RefinedQuizEvidence,
+        evidence_bundle: QuizEvidenceBundle,
         *,
         target_total: int,
-        concept_target: int,
-        data_target: int,
-    ) -> tuple[GeneratedQuizBankPayload, dict[str, Any]]:
+        qualitative_target: int,
+        quantitative_target: int,
+    ) -> tuple[list[QuizQuestion], dict[str, Any]]:
         question_slots = self._build_question_slots(
-            concept_target=concept_target, data_target=data_target
+            qualitative_target=qualitative_target,
+            quantitative_target=quantitative_target,
         )
         system_prompt, user_prompt = build_quiz_generation_prompts(
             task_spec,
             evidence_bundle,
             target_question_count=target_total,
-            concept_target=concept_target,
-            data_target=data_target,
+            qualitative_target=qualitative_target,
+            quantitative_target=quantitative_target,
             question_slots=question_slots,
         )
 
@@ -600,15 +598,10 @@ class SlidesGenQuizBankService:
                 if not isinstance(payload, dict):
                     raise ValueError("quiz_generation must return a JSON object")
                 generated_questions = self._parse_questions_payload(payload)
-                metadata = (
-                    payload.get("metadata")
-                    if isinstance(payload.get("metadata"), dict)
-                    else {}
-                )
                 valid_questions, failures, extra_question_ids = (
                     self._validate_question_collection(
                         generated_questions,
-                        evidence=evidence_bundle,
+                        evidence_bundle=evidence_bundle,
                         expected_slots=question_slots,
                     )
                 )
@@ -626,15 +619,13 @@ class SlidesGenQuizBankService:
                     valid_questions.extend(repaired_questions)
 
                 final_questions = self._merge_questions_by_slot(
-                    questions=valid_questions, expected_slots=question_slots
-                )
-                parsed = GeneratedQuizBankPayload(
-                    questions=final_questions, metadata=metadata
+                    questions=valid_questions,
+                    expected_slots=question_slots,
                 )
                 diagnostics = {
                     "attempts": attempt,
                     "max_tokens": 4000,
-                    "question_count": len(parsed.questions),
+                    "question_count": len(final_questions),
                     "full_generation_invalid_count": len(failures),
                 }
                 if extra_question_ids:
@@ -643,7 +634,7 @@ class SlidesGenQuizBankService:
                     diagnostics["repaired_slots"] = failures
                 if repair_diagnostics:
                     diagnostics["repair"] = repair_diagnostics
-                return parsed, diagnostics
+                return final_questions, diagnostics
             except Exception as error:
                 last_error = error
 
@@ -670,5 +661,4 @@ class SlidesGenQuizBankService:
 __all__ = [
     "QuizBankGenerationService",
     "SlidesGenQuizBankService",
-    "StructuredQuizLLMClient",
 ]

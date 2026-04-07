@@ -15,7 +15,6 @@ from server.utils.reward_models import (
     ExtractedChart,
     ExtractedImage,
     ExtractedPresentation,
-    PresentationSemanticIndex,
     ExtractedShape,
     ExtractedSlide,
     ExtractedTable,
@@ -282,28 +281,11 @@ def _shape_kind(shape: Any, slide_height_in: float) -> tuple[str, str | None]:
     return "unknown", None
 
 
-def _semantic_role(
-    slide_id: int,
-    shape_id: int,
-    inferred_role: str | None,
-    presentation_semantics: PresentationSemanticIndex | None,
-) -> str | None:
-    if presentation_semantics is None:
-        return inferred_role
-    if (slide_id, shape_id) in presentation_semantics.shape_semantics:
-        payload = presentation_semantics.shape_semantics[(slide_id, shape_id)]
-        return (
-            payload.get("semantic_role") or payload.get("shape_kind") or inferred_role
-        )
-    return inferred_role
-
-
 def _extract_shape(
     slide: Any,
     slide_index: int,
     shape: Any,
     z_index: int,
-    presentation_semantics: PresentationSemanticIndex | None,
     *,
     slide_height_in: float,
 ) -> ExtractedShape:
@@ -328,12 +310,7 @@ def _extract_shape(
     return ExtractedShape(
         shape_id=shape.shape_id,
         shape_kind=shape_kind,
-        semantic_role=_semantic_role(
-            slide.slide_id,
-            shape.shape_id,
-            inferred_role,
-            presentation_semantics,
-        ),
+        semantic_role=inferred_role,
         name=None,
         x=float(shape.left.inches),
         y=float(shape.top.inches),
@@ -470,8 +447,6 @@ class PptxExtractionService:
     def inspect_presentation(
         self,
         presentation: PptxEditor | PptxPresentation | str,
-        *,
-        presentation_semantics: PresentationSemanticIndex | None = None,
     ) -> ExtractedPresentation:
         opened = open_presentation(presentation)
         slides = []
@@ -480,7 +455,6 @@ class PptxExtractionService:
                 self.inspect_slide(
                     slide_index,
                     presentation=opened.presentation,
-                    presentation_semantics=presentation_semantics,
                 )
             )
 
@@ -523,7 +497,6 @@ class PptxExtractionService:
         slide_index: int,
         *,
         presentation: PptxEditor | PptxPresentation,
-        presentation_semantics: PresentationSemanticIndex | None = None,
     ) -> ExtractedSlide:
         opened = open_presentation(presentation)
         if slide_index < 1 or slide_index > len(opened.presentation.slides):
@@ -538,7 +511,6 @@ class PptxExtractionService:
                 slide_index,
                 shape,
                 z_index,
-                presentation_semantics,
                 slide_height_in=slide_height,
             )
             for z_index, shape in enumerate(slide.shapes)
