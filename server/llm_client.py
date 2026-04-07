@@ -1,4 +1,4 @@
-"""Unified OpenAI-client wrapper for environment-side LLM calls."""
+"""Unified OpenAI-client wrapper for environment-side judge LLM calls."""
 
 import json
 import logging
@@ -11,20 +11,26 @@ logger = logging.getLogger(__name__)
 
 
 class LLMClient:
-    """Thin wrapper around the OpenAI client using submission env vars."""
+    """Thin wrapper around the OpenAI client using judge env vars."""
 
     def __init__(self):
-        self.model = os.environ.get("MODEL_NAME", "Qwen/Qwen3.5-9B")
-        self.base_url = os.environ.get(
-            "API_BASE_URL", "https://router.huggingface.co/v1"
+        self.model = os.environ.get(
+            "JUDGE_MODEL_NAME",
+            "moonshotai/kimi-k2-instruct-0905",
         )
-        api_key = os.environ.get("HF_TOKEN")
+        self.base_url = os.environ.get(
+            "JUDGE_API_BASE_URL",
+            "https://router.huggingface.co/v1",
+        )
+        api_key = os.environ.get("JUDGE_API_KEY")
         if not api_key:
-            raise ValueError("HF_TOKEN environment variable is required")
+            raise ValueError("JUDGE_API_KEY must be set")
 
         self.client = OpenAI(base_url=self.base_url, api_key=api_key)
         logger.info(
-            "LLM client configured model=%s base_url=%s", self.model, self.base_url
+            "Judge LLM client configured model=%s base_url=%s",
+            self.model,
+            self.base_url,
         )
 
     def chat(
