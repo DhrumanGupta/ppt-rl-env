@@ -34,7 +34,7 @@ def score_presentbench(
 ) -> PresentBenchScoreResult:
     diagnostics = compute_presentation_diagnostics(presentation_extraction, task_spec)
     checklist_results = [
-        score_checklist_item(item, presentation_extraction, task_spec)
+        score_checklist_item(item, presentation_extraction, task_spec, diagnostics)
         for item in eval_spec.checklist
     ]
     dimension_scores = mean_scores_by_dimension(checklist_results)
@@ -59,14 +59,11 @@ def score_presentbench(
         + dimension_weights["fidelity"] * s_fidelity
     )
 
-    c_open = 1.0
-    c_safety = 1.0
     c_fidelity_critical = (
         0.5
-        if s_fidelity < 1.0
-        and any(
-            result["dimension"] == "fidelity" and result["verdict"] == "no"
-            for result in checklist_results
+        if any(
+            r["dimension"] == "fidelity" and r["verdict"] == "no"
+            for r in checklist_results
         )
         else 1.0
     )
@@ -76,7 +73,7 @@ def score_presentbench(
     c_blankness = (
         0.6 if diagnostics["blank_title_only_ratio"] > blankness_threshold else 1.0
     )
-    c_hard = min(c_open, c_safety, c_fidelity_critical, c_blankness)
+    c_hard = min(c_fidelity_critical, c_blankness)
 
     penalty_config = eval_spec.scoring_config["soft_penalties"]
     soft_penalties = {
@@ -118,11 +115,8 @@ def score_presentbench(
             "S_engagement": aesthetics_scores["engagement"],
             "S_usability": aesthetics_scores["usability"],
             "S_rhythm": aesthetics_scores["rhythm"],
-            "deterministic_visual_score": s_visual,
         },
         hard_caps={
-            "C_open": c_open,
-            "C_safety": c_safety,
             "C_fidelity_critical": c_fidelity_critical,
             "C_blankness": c_blankness,
             "C_hard": c_hard,
@@ -166,8 +160,6 @@ def score_presentbench_slide(
                 "S_local_usability": 0.0,
             },
             hard_caps={
-                "C_slide_open": 1.0,
-                "C_slide_safety": 1.0,
                 "C_slide_fidelity_critical": 1.0,
                 "C_slide_blankness": 1.0,
                 "C_slide_hard": 1.0,
@@ -187,8 +179,6 @@ def score_presentbench_slide(
             slide_extraction,
             target_slide.slide_role,
             target_slide.title_hint,
-            target_slide.required_points,
-            target_slide.required_exact_values,
             target_slide.required_shape_kinds,
             task_spec,
         )
@@ -202,8 +192,6 @@ def score_presentbench_slide(
     s_local_fidelity = dimension_scores.get("local_fidelity", 0.0)
     s_local_usability = dimension_scores.get("local_usability", 0.0)
 
-    c_slide_open = 1.0
-    c_slide_safety = 1.0
     c_slide_fidelity_critical = (
         0.5 if (s_local_fidelity < 1.0 and target_slide.required_exact_values) else 1.0
     )
@@ -212,9 +200,7 @@ def score_presentbench_slide(
         if is_blank_or_title_only(slide_extraction) and target_slide.required_points
         else 1.0
     )
-    c_slide_hard = min(
-        c_slide_open, c_slide_safety, c_slide_fidelity_critical, c_slide_blankness
-    )
+    c_slide_hard = min(c_slide_fidelity_critical, c_slide_blankness)
 
     penalty_config = eval_spec.scoring_config["soft_penalties"]
     overlap = compute_overlap_ratio(slide_extraction)
@@ -226,13 +212,13 @@ def score_presentbench_slide(
     wrong_slot_behavior = 0.0 if s_prompt_alignment >= 1.0 else 1.0
 
     soft_penalties = {
-        "missing_citation": penalty_config["redundancy"] * 0.0
-        + 0.03 * missing_citation,
+        "missing_citation": penalty_config["missing_citations"] * missing_citation,
         "redundancy": penalty_config["redundancy"] * redundancy,
         "wrong_slot_behavior": penalty_config["wrong_slot_behavior"]
         * wrong_slot_behavior,
-        "tiny_text": 0.02 * (1.0 if min_font is not None and min_font < 10 else 0.0),
-        "overlap": 0.02 * overlap,
+        "tiny_text": penalty_config["tiny_text"]
+        * (1.0 if min_font is not None and min_font < 10 else 0.0),
+        "overlap": penalty_config["overlap"] * overlap,
     }
     p_slide_soft = sum(soft_penalties.values())
     reward_total = clamp(
@@ -259,16 +245,12 @@ def score_presentbench_slide(
             "S_local_usability": s_local_usability,
         },
         hard_caps={
-            "C_slide_open": c_slide_open,
-            "C_slide_safety": c_slide_safety,
             "C_slide_fidelity_critical": c_slide_fidelity_critical,
             "C_slide_blankness": c_slide_blankness,
             "C_slide_hard": c_slide_hard,
         },
         soft_penalties=soft_penalties,
         checklist_results=checklist_results,
-        aesthetics_results={},
-        artifacts={},
         metadata={
             "slide_index": slide_index,
             "slide_id": slide_extraction.slide_id,
@@ -277,7 +259,6 @@ def score_presentbench_slide(
             "required_points": target_slide.required_points,
             "judge_call_count": 0,
             "used_previous_slide_context": previous_slide_extractions is not None,
-            "used_mllm": use_mllm,
             "spec_hash": eval_spec.spec_hash,
             "mode": mode,
         },

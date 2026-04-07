@@ -30,22 +30,15 @@ def compute_presentation_diagnostics(
         if slide.text_metrics.get("min_font_size_pt") is not None
     ]
     overlap_ratios = [compute_overlap_ratio(slide) for slide in extraction.slides]
-    blank_slides = [
-        slide.slide_index
-        for slide in extraction.slides
-        if is_blank_or_title_only(slide)
-    ]
+    blank_count = sum(
+        1 for slide in extraction.slides if is_blank_or_title_only(slide)
+    )
     all_fonts = {
         font
         for slide in extraction.slides
         for font in slide.text_metrics.get("unique_font_families", [])
     }
     citation_count = sum(len(slide.citations) for slide in extraction.slides)
-    quantitative_slides = [
-        slide.slide_index
-        for slide in extraction.slides
-        if extract_numbers(slide_text_corpus(slide))
-    ]
     return {
         "slide_count": extraction.slide_count,
         "slide_count_violation": int(
@@ -58,8 +51,7 @@ def compute_presentation_diagnostics(
                 and extraction.slide_count > task_spec.max_slides
             )
         ),
-        "blank_slide_indexes": blank_slides,
-        "blank_title_only_ratio": (len(blank_slides) / extraction.slide_count)
+        "blank_title_only_ratio": (blank_count / extraction.slide_count)
         if extraction.slide_count
         else 1.0,
         "citation_count": citation_count,
@@ -67,12 +59,8 @@ def compute_presentation_diagnostics(
         if extraction.slide_count
         else 0.0,
         "min_font_size_pt": min(min_font_sizes) if min_font_sizes else None,
-        "median_overlap_ratio": sorted(overlap_ratios)[len(overlap_ratios) // 2]
-        if overlap_ratios
-        else 0.0,
         "max_overlap_ratio": max(overlap_ratios) if overlap_ratios else 0.0,
         "unique_font_family_count": len(all_fonts),
-        "quantitative_slide_count": len(quantitative_slides),
     }
 
 
@@ -143,17 +131,17 @@ def _source_supported(text: str, task_spec: TaskSpec) -> bool:
             return True
     source_values = set(task_spec.metadata.get("source_values", []))
     numbers = set(extract_numbers(text))
-    if numbers and not numbers.issubset(source_values):
-        return False
-    return not numbers
+    if numbers:
+        return numbers.issubset(source_values)
+    return True
 
 
 def score_checklist_item(
     item: ChecklistItem,
     extraction: ExtractedPresentation,
     task_spec: TaskSpec,
+    diagnostics: dict[str, Any],
 ) -> dict[str, Any]:
-    diagnostics = compute_presentation_diagnostics(extraction, task_spec)
     deck_text = deck_text_corpus(extraction)
     verdict = False
     evidence: dict[str, Any] = {}
@@ -197,7 +185,16 @@ def score_checklist_item(
     elif item.item_kind == "citation_coverage":
         verdict = diagnostics["citation_count"] >= max(1, extraction.slide_count // 3)
         evidence = {"citation_count": diagnostics["citation_count"]}
-    elif item.item_kind in {"slide_fidelity", "deck_fidelity"}:
+    elif item.item_kind == "slide_fidelity":
+        target_slides = [
+            slide for slide in extraction.slides
+            if slide.slide_index in (item.required_slide_scope or [])
+        ]
+        verdict = all(
+            _source_supported(slide_text_corpus(slide), task_spec)
+            for slide in target_slides
+        ) if target_slides else True
+    elif item.item_kind == "deck_fidelity":
         verdict = all(
             _source_supported(slide_text_corpus(slide), task_spec)
             for slide in extraction.slides
@@ -218,8 +215,6 @@ def score_slide_checklist_item(
     slide: ExtractedSlide,
     target_role: str,
     title_hint: str | None,
-    required_points: list[str],
-    required_exact_values: list[str],
     required_shape_kinds: list[str],
     task_spec: TaskSpec,
 ) -> dict[str, Any]:
@@ -266,8 +261,6 @@ def score_slide_checklist_item(
         "evidence": evidence,
         "target_role": target_role,
         "title_hint": title_hint,
-        "required_points": required_points,
-        "required_exact_values": required_exact_values,
     }
 
 

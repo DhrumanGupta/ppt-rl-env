@@ -128,8 +128,6 @@ def _reward_result_for_failure(
         reward_total=0.0,
         reward_breakdown={"R_total": 0.0, "R_pb": 0.0, "R_sg": 0.0},
         hard_caps={
-            "C_open": 0.0,
-            "C_safety": 1.0,
             "C_fidelity_critical": 1.0,
             "C_blankness": 1.0,
             "C_hard": 0.0,
@@ -289,8 +287,6 @@ def evaluate_slide(
                 "S_local_usability": 0.0,
             },
             hard_caps={
-                "C_slide_open": 0.0,
-                "C_slide_safety": 1.0,
                 "C_slide_fidelity_critical": 1.0,
                 "C_slide_blankness": 1.0,
                 "C_slide_hard": 0.0,

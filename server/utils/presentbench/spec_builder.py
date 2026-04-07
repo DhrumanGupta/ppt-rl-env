@@ -14,17 +14,15 @@ SPEC_VERSION = "1.0"
 
 DEFAULT_PRESENTBENCH_SCORING_CONFIG = {
     "dimension_weights": {
-        "fundamentals": 0.15,
-        "visual_layout": 0.10,
+        "fundamentals": 0.20,
+        "visual_layout": 0.20,
         "completeness": 0.20,
-        "correctness": 0.25,
-        "fidelity": 0.30,
+        "correctness": 0.20,
+        "fidelity": 0.20,
     },
     "aesthetic_weight": 0.15,
     "hard_caps": {
         "blank_title_only_ratio_threshold": 0.4,
-        "critical_fidelity_cap": 0.5,
-        "blankness_cap": 0.6,
     },
     "soft_penalties": {
         "slide_count_violation": 0.02,
@@ -44,7 +42,6 @@ def generate_checklist(task_spec: TaskSpec) -> list[ChecklistItem]:
             dimension="fundamentals",
             prompt_text="Is the slide count within the requested range?",
             item_kind="slide_count_range",
-            source_refs=[],
         ),
         ChecklistItem(
             item_id="fundamentals_theme",
@@ -52,35 +49,30 @@ def generate_checklist(task_spec: TaskSpec) -> list[ChecklistItem]:
             prompt_text="Does the deck maintain a central theme aligned with the prompt?",
             item_kind="theme_alignment",
             relevant_sections=task_spec.required_sections,
-            source_refs=[],
         ),
         ChecklistItem(
             item_id="fundamentals_audience",
             dimension="fundamentals",
             prompt_text="Is the deck appropriate for the intended audience and tone?",
             item_kind="audience_tone",
-            source_refs=[],
         ),
         ChecklistItem(
             item_id="visual_readability",
             dimension="visual_layout",
             prompt_text="Is the text readable without tiny fonts?",
             item_kind="readable_text",
-            source_refs=[],
         ),
         ChecklistItem(
             item_id="visual_overlap",
             dimension="visual_layout",
             prompt_text="Are there no major overlaps or clipping risks?",
             item_kind="no_major_overlap",
-            source_refs=[],
         ),
         ChecklistItem(
             item_id="visual_consistency",
             dimension="visual_layout",
             prompt_text="Is the visual design reasonably consistent across slides?",
             item_kind="design_consistency",
-            source_refs=[],
         ),
     ]
 
@@ -92,7 +84,6 @@ def generate_checklist(task_spec: TaskSpec) -> list[ChecklistItem]:
                 prompt_text=f"Does the deck include a clear '{section}' section?",
                 item_kind="required_section",
                 relevant_sections=[section],
-                source_refs=[],
             )
         )
 
@@ -128,7 +119,6 @@ def generate_checklist(task_spec: TaskSpec) -> list[ChecklistItem]:
                 dimension="correctness",
                 prompt_text="Are factual claims supported with citation-like content where needed?",
                 item_kind="citation_coverage",
-                source_refs=[],
             )
         )
 
@@ -142,7 +132,6 @@ def generate_checklist(task_spec: TaskSpec) -> list[ChecklistItem]:
                     item_kind="slide_fidelity",
                     required_slide_scope=[slide.slide_index],
                     relevant_sections=[slide.slide_role],
-                    source_refs=[],
                 )
             )
     else:
@@ -152,7 +141,6 @@ def generate_checklist(task_spec: TaskSpec) -> list[ChecklistItem]:
                 dimension="fidelity",
                 prompt_text="Is all deck content supported by the source pack?",
                 item_kind="deck_fidelity",
-                source_refs=[],
             )
         )
 
@@ -170,7 +158,6 @@ def generate_slide_checklists(task_spec: TaskSpec) -> dict[int, list[ChecklistIt
                 item_kind="slide_role_match",
                 required_slide_scope=[slide.slide_index],
                 relevant_sections=[slide.slide_role],
-                source_refs=[],
             ),
             ChecklistItem(
                 item_id=f"slide_{slide.slide_index:02d}_title_alignment",
@@ -179,7 +166,6 @@ def generate_slide_checklists(task_spec: TaskSpec) -> dict[int, list[ChecklistIt
                 item_kind="slide_title_alignment",
                 required_slide_scope=[slide.slide_index],
                 relevant_sections=[slide.slide_role],
-                source_refs=[],
             ),
             ChecklistItem(
                 item_id=f"slide_{slide.slide_index:02d}_fidelity",
@@ -188,7 +174,6 @@ def generate_slide_checklists(task_spec: TaskSpec) -> dict[int, list[ChecklistIt
                 item_kind="slide_fidelity",
                 required_slide_scope=[slide.slide_index],
                 relevant_sections=[slide.slide_role],
-                source_refs=[],
             ),
             ChecklistItem(
                 item_id=f"slide_{slide.slide_index:02d}_usability",
@@ -197,7 +182,6 @@ def generate_slide_checklists(task_spec: TaskSpec) -> dict[int, list[ChecklistIt
                 item_kind="slide_readability",
                 required_slide_scope=[slide.slide_index],
                 relevant_sections=[slide.slide_role],
-                source_refs=[],
             ),
         ]
         for point_index, point in enumerate(slide.required_points, start=1):
@@ -209,7 +193,6 @@ def generate_slide_checklists(task_spec: TaskSpec) -> dict[int, list[ChecklistIt
                     item_kind="slide_required_point",
                     required_slide_scope=[slide.slide_index],
                     relevant_sections=[slide.slide_role],
-                    source_refs=[],
                 )
             )
         for exact_index, exact_value in enumerate(slide.required_exact_values, start=1):
@@ -221,7 +204,6 @@ def generate_slide_checklists(task_spec: TaskSpec) -> dict[int, list[ChecklistIt
                     item_kind="slide_exact_value",
                     required_slide_scope=[slide.slide_index],
                     relevant_sections=[slide.slide_role],
-                    source_refs=[],
                 )
             )
         if slide.required_shape_kinds:
@@ -233,10 +215,6 @@ def generate_slide_checklists(task_spec: TaskSpec) -> dict[int, list[ChecklistIt
                     item_kind="slide_required_visual",
                     required_slide_scope=[slide.slide_index],
                     relevant_sections=[slide.slide_role],
-                    source_refs=[],
-                    evidence_policy={
-                        "required_shape_kinds": slide.required_shape_kinds
-                    },
                 )
             )
         slide_checklists[slide.slide_index] = items
