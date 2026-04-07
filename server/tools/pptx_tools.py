@@ -16,10 +16,14 @@ def create_presentation(path: Optional[str | PathLike[str]] = None) -> PptxEdito
     return PptxEditor(str(path))
 
 
-def save_presentation(editor: PptxEditor, path: str | PathLike[str]) -> None:
+def save_presentation(editor: PptxEditor, path: str | PathLike[str]) -> Dict[str, Any]:
     output_path = Path(path)
     output_path.parent.mkdir(parents=True, exist_ok=True)
     editor.prs.save(output_path)
+    return {
+        "path": str(output_path.resolve()),
+        "slide_count": len(editor.prs.slides),
+    }
 
 
 def register_theme(
@@ -381,6 +385,17 @@ def _delete_shape(editor: PptxEditor, slide_id: int, shape_id: int) -> None:
     _remove_bindings(editor, slide_id=slide_id, shape_id=shape_id)
 
 
+def delete_slide(editor: PptxEditor, slide_id: int) -> Dict[str, Any]:
+    slide_index = editor.get_slide_index(slide_id)
+    editor.delete_slide_by_id(slide_id)
+    _remove_bindings(editor, slide_id=slide_id)
+    return {
+        "slide_id": slide_id,
+        "deleted_slide_index": slide_index + 1,
+        "remaining_slide_count": len(editor.prs.slides),
+    }
+
+
 def create_slide(
     editor: PptxEditor,
     *,
@@ -485,5 +500,6 @@ __all__ = [
     "register_theme",
     "update_theme",
     "create_slide",
+    "delete_slide",
     "update_slide",
 ]

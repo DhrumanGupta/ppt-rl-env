@@ -285,6 +285,18 @@ class PptxEditor:
         del xml_slides[old_index]
         xml_slides.insert(new_index, slide_elem)
 
+    def delete_slide(self, slide_index: int) -> int:
+        self._validate_slide(slide_index)
+        slide_id = self.get_slide_id(slide_index)
+        slide_rel_id = self.prs.slides._sldIdLst[slide_index].rId
+        self.prs.part.drop_rel(slide_rel_id)
+        del self.prs.slides._sldIdLst[slide_index]
+        return slide_id
+
+    def delete_slide_by_id(self, slide_id: int) -> int:
+        slide_index = self.get_slide_index(slide_id)
+        return self.delete_slide(slide_index)
+
     def set_slide_layout(self, slide_index: int, layout_index: int):
         self._validate_slide(slide_index)
         if layout_index < 0 or layout_index >= len(self.prs.slide_layouts):

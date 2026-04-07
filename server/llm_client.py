@@ -10,7 +10,6 @@ import json
 import logging
 import os
 import re
-import time
 
 logger = logging.getLogger(__name__)
 
@@ -68,18 +67,65 @@ class LLMClient:
         self, system: str, user: str, temperature: float = 0.3, max_tokens: int = 1024
     ) -> dict:
         """Send a chat request and parse the response as JSON."""
-        raw = self.chat(system, user, temperature, max_tokens)
+        if self.backend == "hf":
+            raw = self._chat_hf(system, user, temperature, max_tokens)
+        else:
+            raw = self._chat_openai(
+                system,
+                user,
+                temperature,
+                max_tokens,
+                json_mode=True,
+            )
         return self._parse_json(raw)
 
     @staticmethod
     def _parse_json(raw: str) -> dict:
         """Extract and parse JSON from LLM response, handling markdown fences."""
-        raw = raw.strip()
+        if raw is None:
+            raise ValueError("LLM returned empty content")
+        raw = str(raw).strip()
+        raw = re.sub(r"<think>.*?</think>", "", raw, flags=re.DOTALL).strip()
         # Strip ```json ... ``` or ``` ... ``` wrappers
         fence_match = re.search(r"```(?:json)?\s*\n?(.*?)```", raw, re.DOTALL)
         if fence_match:
             raw = fence_match.group(1).strip()
-        return json.loads(raw)
+        if not raw:
+            raise ValueError("LLM returned empty content")
+        try:
+            return json.loads(raw)
+        except json.JSONDecodeError:
+            object_match = re.search(r"\{.*\}", raw, re.DOTALL)
+            if object_match is None:
+                raise
+            return json.loads(object_match.group(0))
+
+    @staticmethod
+    def _extract_chat_content(message_content) -> str:
+        if isinstance(message_content, str):
+            return message_content
+        if message_content is None:
+            return ""
+        if isinstance(message_content, list):
+            parts: list[str] = []
+            for item in message_content:
+                if isinstance(item, str):
+                    parts.append(item)
+                    continue
+                if isinstance(item, dict):
+                    text_value = item.get("text")
+                    if isinstance(text_value, str):
+                        parts.append(text_value)
+                    elif item.get("type") == "text" and isinstance(
+                        item.get("content"), str
+                    ):
+                        parts.append(item["content"])
+                    continue
+                text_attr = getattr(item, "text", None)
+                if isinstance(text_attr, str):
+                    parts.append(text_attr)
+            return "\n".join(part for part in parts if part)
+        return str(message_content)
 
     def _chat_hf(
         self, system: str, user: str, temperature: float, max_tokens: int
@@ -95,15 +141,32 @@ class LLMClient:
         return response.choices[0].message.content
 
     def _chat_openai(
-        self, system: str, user: str, temperature: float, max_tokens: int
+        self,
+        system: str,
+        user: str,
+        temperature: float,
+        max_tokens: int,
+        *,
+        json_mode: bool = False,
     ) -> str:
-        response = self.client.chat.completions.create(
-            model=self.model,
-            messages=[
+        request_kwargs = {
+            "model": self.model,
+            "messages": [
                 {"role": "system", "content": system},
                 {"role": "user", "content": user},
             ],
-            temperature=temperature,
-            max_tokens=max_tokens,
-        )
-        return response.choices[0].message.content
+            "temperature": temperature,
+            "max_tokens": max_tokens,
+        }
+        if json_mode:
+            request_kwargs["response_format"] = {"type": "json_object"}
+
+        try:
+            response = self.client.chat.completions.create(**request_kwargs)
+        except Exception:
+            if not json_mode:
+                raise
+            request_kwargs.pop("response_format", None)
+            response = self.client.chat.completions.create(**request_kwargs)
+
+        return self._extract_chat_content(response.choices[0].message.content)

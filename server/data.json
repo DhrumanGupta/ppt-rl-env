@@ -1,0 +1,298 @@
+{
+  "scenarios": [
+    {
+      "task_id": "northstar_growth_easy",
+      "difficulty": "easy",
+      "prompt_text": "Create a factual two-slide presentation for a professional audience about Harbor Retail Expansion 2026. Slide 1 should introduce the initiative, the operating focus, and why management launched it. Slide 2 should summarize the measurable business results, including same-store sales growth from 4.2% to 6.1% and delivery complaints reduced by 22%, with a source citation.",
+      "task_constraints": {
+        "min_slides": 2,
+        "max_slides": 2,
+        "target_audience": "professional",
+        "tone": "professional",
+        "extra_constraints": {}
+      },
+      "theme": {
+        "bg": "#F8FAFC",
+        "surface": "#FFFFFF",
+        "accent": "#2563EB",
+        "primary": "#0F172A",
+        "secondary": "#475569",
+        "font": "Aptos",
+        "title_size": 28,
+        "body_size": 16,
+        "caption_size": 10
+      },
+      "source_documents": [
+        {
+          "doc_id": "retail_memo",
+          "title": "Harbor retail expansion memo",
+          "path": null,
+          "mime_type": "text/plain",
+          "text": "Harbor Retail Expansion 2026 focuses on urban store performance and fulfillment reliability. Leadership launched the program after margin pressure in city-format stores and inconsistent delivery service in top metro markets. Same-store sales increased from 4.2% to 6.1% after regional assortment updates. Delivery complaints fell by 22% after consolidating the final-mile carrier mix and tightening service-level monitoring.",
+          "pages": null,
+          "images": null,
+          "metadata": {}
+        },
+        {
+          "doc_id": "ops_note",
+          "title": "Store operations note",
+          "path": null,
+          "mime_type": "text/plain",
+          "text": "The operating focus of the expansion was higher in-stock accuracy, faster replenishment for urban stores, and a more reliable delivery handoff for online orders. Management positioned the initiative as a practical growth lever rather than a large-format expansion bet.",
+          "pages": null,
+          "images": null,
+          "metadata": {}
+        }
+      ],
+      "metadata": {
+        "domain": "business",
+        "curriculum_stage": 1
+      }
+    },
+    {
+      "task_id": "lattice_health_easy",
+      "difficulty": "easy",
+      "prompt_text": "Create a factual three-slide presentation for a healthcare operations audience about Lattice Health Intake Redesign. Slide 1 should introduce the redesign program and its operational goal. Slide 2 should explain the workflow changes, including nurse triage routing and digital pre-visit forms. Slide 3 should summarize the measurable outcomes, including intake time reduced from 19 minutes to 11 minutes and no-show rate improved from 14% to 9%, with a source citation.",
+      "task_constraints": {
+        "min_slides": 3,
+        "max_slides": 3,
+        "target_audience": "operations",
+        "tone": "professional",
+        "extra_constraints": {}
+      },
+      "theme": {
+        "bg": "#F6FAFD",
+        "surface": "#FFFFFF",
+        "accent": "#0F766E",
+        "primary": "#0B1F2A",
+        "secondary": "#48616E",
+        "font": "Aptos",
+        "title_size": 28,
+        "body_size": 16,
+        "caption_size": 10
+      },
+      "source_documents": [
+        {
+          "doc_id": "clinic_brief",
+          "title": "Lattice clinic operations brief",
+          "path": null,
+          "mime_type": "text/plain",
+          "text": "Lattice Health launched the Intake Redesign program to reduce front-desk bottlenecks and improve visit readiness. The redesign combined digital pre-visit forms, earlier insurance validation, and nurse triage routing for patients with chronic-care follow-up needs.",
+          "pages": null,
+          "images": null,
+          "metadata": {}
+        },
+        {
+          "doc_id": "performance_snapshot",
+          "title": "Performance snapshot",
+          "path": null,
+          "mime_type": "text/plain",
+          "text": "Average intake time declined from 19 minutes to 11 minutes within eight weeks of rollout. The no-show rate improved from 14% to 9% after reminder timing and digital form completion were linked. Operations leadership highlighted shorter queues, better exam-room utilization, and fewer manual eligibility calls.",
+          "pages": null,
+          "images": null,
+          "metadata": {}
+        }
+      ],
+      "metadata": {
+        "domain": "healthcare",
+        "curriculum_stage": 1
+      }
+    },
+    {
+      "task_id": "northstar_growth_medium",
+      "difficulty": "medium",
+      "prompt_text": "Create a factual four-slide presentation for a professional audience about Northstar Growth Plan 2026. Slide 1 should introduce the plan and its business objective. Slide 2 should explain the retention improvement from 88% to 93% and why it matters commercially. Slide 3 should explain how guided automation reduced onboarding time by 35%, with a source citation. Slide 4 should show a revenue chart with quarterly target values 18, 24, 28, and 32.",
+      "task_constraints": {
+        "min_slides": 4,
+        "max_slides": 4,
+        "target_audience": "professional",
+        "tone": "professional",
+        "extra_constraints": {}
+      },
+      "theme": {
+        "bg": "#F8FAFC",
+        "surface": "#FFFFFF",
+        "accent": "#2563EB",
+        "primary": "#0F172A",
+        "secondary": "#475569",
+        "font": "Aptos",
+        "title_size": 28,
+        "body_size": 16,
+        "caption_size": 10
+      },
+      "source_documents": [
+        {
+          "doc_id": "memo",
+          "title": "Northstar plan memo",
+          "path": null,
+          "mime_type": "text/plain",
+          "text": "Northstar Growth Plan 2026 focuses on retention and onboarding. Leadership framed the plan as a path to more efficient expansion in enterprise accounts. Enterprise retention improved from 88% to 93%. Guided automation reduced onboarding time by 35%. Quarterly revenue targets are 18, 24, 28, and 32 million dollars.",
+          "pages": null,
+          "images": null,
+          "metadata": {}
+        },
+        {
+          "doc_id": "commercial_note",
+          "title": "Commercial strategy note",
+          "path": null,
+          "mime_type": "text/plain",
+          "text": "The commercial team linked higher retention to better net revenue durability and lower replacement-selling pressure. Faster onboarding improved time-to-value for new customers and reduced implementation backlog for customer success teams.",
+          "pages": null,
+          "images": null,
+          "metadata": {}
+        }
+      ],
+      "metadata": {
+        "domain": "business",
+        "curriculum_stage": 2
+      }
+    },
+    {
+      "task_id": "solstice_logistics_medium",
+      "difficulty": "medium",
+      "prompt_text": "Create a factual four-slide presentation for an operations leadership audience about Solstice Logistics Network Reset. Slide 1 should introduce the network reset and its objective. Slide 2 should explain the route and hub changes implemented. Slide 3 should summarize the measurable results, including on-time delivery improved from 91% to 96% and line-haul cost per package fell by 13%, with a source citation. Slide 4 should show a chart of quarterly package volume targets with values 52, 56, 61, and 68.",
+      "task_constraints": {
+        "min_slides": 4,
+        "max_slides": 4,
+        "target_audience": "operations leadership",
+        "tone": "professional",
+        "extra_constraints": {}
+      },
+      "theme": {
+        "bg": "#FBFBF8",
+        "surface": "#FFFFFF",
+        "accent": "#B45309",
+        "primary": "#1F2937",
+        "secondary": "#5B6470",
+        "font": "Aptos",
+        "title_size": 28,
+        "body_size": 16,
+        "caption_size": 10
+      },
+      "source_documents": [
+        {
+          "doc_id": "network_brief",
+          "title": "Network reset brief",
+          "path": null,
+          "mime_type": "text/plain",
+          "text": "Solstice Logistics launched a network reset to restore service reliability in fast-growing regional corridors. The plan reduced low-density routes, shifted parcel flow into two upgraded sort hubs, and redesigned line-haul schedules around later order cutoffs.",
+          "pages": null,
+          "images": null,
+          "metadata": {}
+        },
+        {
+          "doc_id": "performance_pack",
+          "title": "Performance pack",
+          "path": null,
+          "mime_type": "text/plain",
+          "text": "On-time delivery improved from 91% to 96% after the route reset. Line-haul cost per package fell by 13% due to denser trailer utilization and fewer partial overnight runs. Quarterly package volume targets are 52, 56, 61, and 68 million parcels.",
+          "pages": null,
+          "images": null,
+          "metadata": {}
+        }
+      ],
+      "metadata": {
+        "domain": "operations",
+        "curriculum_stage": 2
+      }
+    },
+    {
+      "task_id": "northstar_growth_hard",
+      "difficulty": "hard",
+      "prompt_text": "Create a factual five-slide presentation for an executive audience about Aurora Cloud Efficiency Program. Slide 1 should introduce the program and the strategic objective. Slide 2 should summarize the operating context and why efficiency matters for enterprise growth. Slide 3 should present the result that gross margin increased from 61% to 67%. Slide 4 should present the result that incident resolution time dropped by 41%, with a source citation. Slide 5 should show a revenue chart with quarterly target values 42, 48, 57, and 63.",
+      "task_constraints": {
+        "min_slides": 5,
+        "max_slides": 5,
+        "target_audience": "executive",
+        "tone": "formal",
+        "extra_constraints": {}
+      },
+      "theme": {
+        "bg": "#F8FAFC",
+        "surface": "#FFFFFF",
+        "accent": "#2563EB",
+        "primary": "#0F172A",
+        "secondary": "#475569",
+        "font": "Aptos",
+        "title_size": 28,
+        "body_size": 16,
+        "caption_size": 10
+      },
+      "source_documents": [
+        {
+          "doc_id": "ops_brief",
+          "title": "Aurora cloud operating brief",
+          "path": null,
+          "mime_type": "text/plain",
+          "text": "Aurora Cloud Efficiency Program aligned infrastructure cost controls with premium enterprise growth. Gross margin improved from 61% to 67% after reserved-capacity optimization. Incident resolution time dropped by 41% after workflow consolidation. Quarterly revenue targets are 42, 48, 57, and 63 million dollars.",
+          "pages": null,
+          "images": null,
+          "metadata": {}
+        },
+        {
+          "doc_id": "finance_note",
+          "title": "Aurora finance note",
+          "path": null,
+          "mime_type": "text/plain",
+          "text": "Finance leadership expects revenue acceleration to be strongest in the second half, with Q3 and Q4 targets dependent on enterprise renewals and new cloud migration packages. Management emphasized that efficiency gains should support both profitability and premium-service credibility.",
+          "pages": null,
+          "images": null,
+          "metadata": {}
+        }
+      ],
+      "metadata": {
+        "domain": "business",
+        "curriculum_stage": 3
+      }
+    },
+    {
+      "task_id": "quarry_energy_hard",
+      "difficulty": "hard",
+      "prompt_text": "Create a factual five-slide presentation for a board-level audience about Quarry Energy Capital Discipline Program. Slide 1 should introduce the program and the board concern it addresses. Slide 2 should summarize the spending controls and portfolio actions implemented. Slide 3 should explain the result that free cash flow margin increased from 9% to 15%. Slide 4 should explain the result that unplanned maintenance downtime fell by 28%, with a source citation. Slide 5 should show a capital deployment chart with quarterly values 110, 95, 88, and 92.",
+      "task_constraints": {
+        "min_slides": 5,
+        "max_slides": 5,
+        "target_audience": "board",
+        "tone": "formal",
+        "extra_constraints": {}
+      },
+      "theme": {
+        "bg": "#FAF8F5",
+        "surface": "#FFFFFF",
+        "accent": "#7C3AED",
+        "primary": "#1F1B2D",
+        "secondary": "#5F5A72",
+        "font": "Aptos",
+        "title_size": 28,
+        "body_size": 16,
+        "caption_size": 10
+      },
+      "source_documents": [
+        {
+          "doc_id": "board_pack",
+          "title": "Capital discipline board pack",
+          "path": null,
+          "mime_type": "text/plain",
+          "text": "Quarry Energy introduced a Capital Discipline Program after directors questioned return quality under volatile commodity pricing. Management tightened discretionary spend approvals, deferred two low-return field expansions, and shifted maintenance planning toward predictive scheduling. Free cash flow margin increased from 9% to 15% over the following two quarters.",
+          "pages": null,
+          "images": null,
+          "metadata": {}
+        },
+        {
+          "doc_id": "asset_note",
+          "title": "Asset reliability note",
+          "path": null,
+          "mime_type": "text/plain",
+          "text": "Unplanned maintenance downtime fell by 28% after sensor-based inspections replaced fixed-interval checks on priority assets. Quarterly capital deployment values were 110, 95, 88, and 92 million dollars, reflecting the sharper allocation discipline.",
+          "pages": null,
+          "images": null,
+          "metadata": {}
+        }
+      ],
+      "metadata": {
+        "domain": "energy",
+        "curriculum_stage": 3
+      }
+    }
+  ]
+}

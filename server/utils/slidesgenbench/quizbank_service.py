@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import re
 from typing import Any, Protocol
 
@@ -22,6 +23,8 @@ from server.utils.slidesgenbench.prompts import (
 
 _NUMBER_PATTERN = re.compile(r"\b\d+(?:\.\d+)?%?\b")
 _WHITESPACE_PATTERN = re.compile(r"\s+")
+
+logger = logging.getLogger(__name__)
 
 
 class QuizBankGenerationService(Protocol):
@@ -143,6 +146,80 @@ def _parse_evidence_bundle(payload: dict[str, Any]) -> QuizEvidenceBundle:
     )
 
 
+def _sanitize_evidence(
+    raw: Any, *, expected_type: str, default_id: str
+) -> dict[str, Any] | None:
+    if not isinstance(raw, dict):
+        return None
+    doc_id = raw.get("doc_id")
+    source_ref = raw.get("source_ref")
+    if not isinstance(doc_id, str) or not doc_id.strip():
+        if isinstance(source_ref, str) and source_ref.strip():
+            doc_id = source_ref.split(":p", 1)[0].strip()
+    if not isinstance(doc_id, str) or not doc_id.strip():
+        return None
+    try:
+        page = _coerce_page(raw.get("page"))
+    except Exception:
+        page = None
+    statement = raw.get("statement")
+    source_quote = raw.get("source_quote")
+    if not isinstance(statement, str) or not statement.strip():
+        statement = source_quote
+    if not isinstance(statement, str) or not statement.strip():
+        return None
+    if not isinstance(source_quote, str) or not source_quote.strip():
+        source_quote = statement
+    metadata = raw.get("metadata")
+    if not isinstance(metadata, dict):
+        metadata = {}
+    if not isinstance(source_ref, str) or not source_ref.strip():
+        source_ref = _source_ref(doc_id.strip(), page)
+    return {
+        "evidence_id": str(raw.get("evidence_id") or default_id),
+        "evidence_type": expected_type,
+        "statement": statement.strip(),
+        "source_quote": source_quote.strip(),
+        "source_ref": source_ref.strip(),
+        "doc_id": doc_id.strip(),
+        "page": page,
+        "metadata": metadata,
+    }
+
+
+def _sanitize_evidence_bundle_payload(payload: dict[str, Any]) -> dict[str, Any]:
+    quantitative = [
+        item
+        for index, raw in enumerate(payload.get("quantitative_evidence") or [], start=1)
+        if (
+            item := _sanitize_evidence(
+                raw,
+                expected_type="quantitative",
+                default_id=f"quantitative_{index:02d}",
+            )
+        )
+        is not None
+    ]
+    qualitative = [
+        item
+        for index, raw in enumerate(payload.get("qualitative_evidence") or [], start=1)
+        if (
+            item := _sanitize_evidence(
+                raw,
+                expected_type="qualitative",
+                default_id=f"qualitative_{index:02d}",
+            )
+        )
+        is not None
+    ]
+    metadata = payload.get("metadata")
+    return {
+        "quantitative_evidence": quantitative,
+        "qualitative_evidence": qualitative,
+        "metadata": metadata if isinstance(metadata, dict) else {},
+    }
+
+
 def _parse_question(raw: Any, *, default_id: str) -> QuizQuestion:
     if not isinstance(raw, dict):
         raise ValueError("question entry must be an object")
@@ -209,55 +286,74 @@ class SlidesGenQuizBankService:
             source_pack,
             max_source_section_chars=self.max_source_section_chars,
         )
-        extracted_evidence, extraction_diagnostics = self._extract_evidence(
-            task_spec, source_context
-        )
-        verified_evidence, refinement_diagnostics = self._refine_evidence(
-            task_spec,
-            source_pack,
-            source_context,
-            extracted_evidence,
-        )
-
         target_total = max(2, self._target_question_count(source_pack, mode=mode))
         qualitative_target = max(1, target_total // 2)
         quantitative_target = max(1, target_total - qualitative_target)
-        questions, generation_diagnostics = self._generate_questions(
-            task_spec,
-            verified_evidence,
-            target_total=target_total,
-            qualitative_target=qualitative_target,
-            quantitative_target=quantitative_target,
-        )
-
-        metadata = {
-            "service_name": self.__class__.__name__,
-            "generation_mode": "llm_source_grounded",
-            "llm_client_type": self.llm_client.__class__.__name__,
-            "source_section_count": source_section_count,
-            "draft_quantitative_evidence_count": len(
-                extracted_evidence.quantitative_evidence
-            ),
-            "draft_qualitative_evidence_count": len(
-                extracted_evidence.qualitative_evidence
-            ),
-            "verified_quantitative_evidence_count": len(
-                verified_evidence.quantitative_evidence
-            ),
-            "verified_qualitative_evidence_count": len(
-                verified_evidence.qualitative_evidence
-            ),
-            "question_count": len(questions),
-            "question_types": sorted(
-                {question.question_type for question in questions}
-            ),
-            "stage_diagnostics": {
-                "extraction": extraction_diagnostics,
-                "refinement": refinement_diagnostics,
-                "generation": generation_diagnostics,
-            },
-        }
-        return questions, metadata
+        try:
+            extracted_evidence, extraction_diagnostics = self._extract_evidence(
+                task_spec, source_context
+            )
+            verified_evidence, refinement_diagnostics = self._refine_evidence(
+                task_spec,
+                source_pack,
+                source_context,
+                extracted_evidence,
+            )
+            questions, generation_diagnostics = self._generate_questions(
+                task_spec,
+                verified_evidence,
+                target_total=target_total,
+                qualitative_target=qualitative_target,
+                quantitative_target=quantitative_target,
+            )
+            metadata = {
+                "service_name": self.__class__.__name__,
+                "generation_mode": "llm_source_grounded",
+                "llm_client_type": self.llm_client.__class__.__name__,
+                "source_section_count": source_section_count,
+                "draft_quantitative_evidence_count": len(
+                    extracted_evidence.quantitative_evidence
+                ),
+                "draft_qualitative_evidence_count": len(
+                    extracted_evidence.qualitative_evidence
+                ),
+                "verified_quantitative_evidence_count": len(
+                    verified_evidence.quantitative_evidence
+                ),
+                "verified_qualitative_evidence_count": len(
+                    verified_evidence.qualitative_evidence
+                ),
+                "question_count": len(questions),
+                "question_types": sorted(
+                    {question.question_type for question in questions}
+                ),
+                "stage_diagnostics": {
+                    "extraction": extraction_diagnostics,
+                    "refinement": refinement_diagnostics,
+                    "generation": generation_diagnostics,
+                },
+            }
+            return questions, metadata
+        except Exception as error:
+            logger.warning("quizbank fallback enabled: %s", error)
+            questions = self._build_fallback_questions(
+                task_spec,
+                source_pack,
+                target_total=target_total,
+                qualitative_target=qualitative_target,
+                quantitative_target=quantitative_target,
+            )
+            return questions, {
+                "service_name": self.__class__.__name__,
+                "generation_mode": "deterministic_fallback",
+                "llm_client_type": self.llm_client.__class__.__name__,
+                "source_section_count": source_section_count,
+                "question_count": len(questions),
+                "question_types": sorted(
+                    {question.question_type for question in questions}
+                ),
+                "error": str(error),
+            }
 
     def _call_stage_json(
         self,
@@ -270,14 +366,26 @@ class SlidesGenQuizBankService:
         last_error: Exception | None = None
         for attempt in range(1, self.max_attempts + 1):
             try:
+                logger.info(
+                    "quizbank stage start stage=%s attempt=%s", stage_name, attempt
+                )
                 payload = self.llm_client.chat_json(
                     system_prompt, user_prompt, temperature=0.0, max_tokens=max_tokens
                 )
                 if not isinstance(payload, dict):
                     raise ValueError(f"{stage_name} must return a JSON object")
+                logger.info(
+                    "quizbank stage success stage=%s attempt=%s", stage_name, attempt
+                )
                 return payload, {"attempts": attempt, "max_tokens": max_tokens}
             except Exception as error:
                 last_error = error
+                logger.warning(
+                    "quizbank stage failed stage=%s attempt=%s error=%s",
+                    stage_name,
+                    attempt,
+                    error,
+                )
         raise ValueError(
             f"{stage_name} failed after {self.max_attempts} attempt(s): {last_error}"
         )
@@ -296,7 +404,9 @@ class SlidesGenQuizBankService:
             user_prompt=user_prompt,
             max_tokens=3000,
         )
-        evidence_bundle = _parse_evidence_bundle(payload)
+        evidence_bundle = _parse_evidence_bundle(
+            _sanitize_evidence_bundle_payload(payload)
+        )
         if not evidence_bundle.qualitative_evidence:
             raise ValueError("quiz_extraction returned no qualitative evidence")
         diagnostics.update(
@@ -329,6 +439,31 @@ class SlidesGenQuizBankService:
             return False
         return True
 
+    def _verify_bundle(
+        self,
+        bundle: QuizEvidenceBundle,
+        *,
+        source_pack: SourcePack,
+    ) -> QuizEvidenceBundle:
+        source_texts = _document_source_texts(source_pack)
+        return QuizEvidenceBundle(
+            quantitative_evidence=_unique_evidence(
+                [
+                    evidence
+                    for evidence in bundle.quantitative_evidence
+                    if self._verify_evidence(evidence, source_texts=source_texts)
+                ]
+            ),
+            qualitative_evidence=_unique_evidence(
+                [
+                    evidence
+                    for evidence in bundle.qualitative_evidence
+                    if self._verify_evidence(evidence, source_texts=source_texts)
+                ]
+            ),
+            metadata=bundle.metadata,
+        )
+
     def _refine_evidence(
         self,
         task_spec: TaskSpec,
@@ -347,24 +482,18 @@ class SlidesGenQuizBankService:
             user_prompt=user_prompt,
             max_tokens=3000,
         )
-        candidate_bundle = _parse_evidence_bundle(payload)
-        source_texts = _document_source_texts(source_pack)
-        verified_quantitative = [
-            evidence
-            for evidence in candidate_bundle.quantitative_evidence
-            if self._verify_evidence(evidence, source_texts=source_texts)
-        ]
-        verified_qualitative = [
-            evidence
-            for evidence in candidate_bundle.qualitative_evidence
-            if self._verify_evidence(evidence, source_texts=source_texts)
-        ]
-
-        verified_bundle = QuizEvidenceBundle(
-            quantitative_evidence=_unique_evidence(verified_quantitative),
-            qualitative_evidence=_unique_evidence(verified_qualitative),
-            metadata=candidate_bundle.metadata,
+        candidate_bundle = _parse_evidence_bundle(
+            _sanitize_evidence_bundle_payload(payload)
         )
+        verified_bundle = self._verify_bundle(candidate_bundle, source_pack=source_pack)
+        if not verified_bundle.qualitative_evidence:
+            logger.warning(
+                "quizbank refinement empty, falling back to extraction evidence"
+            )
+            verified_bundle = self._verify_bundle(
+                evidence_bundle, source_pack=source_pack
+            )
+            diagnostics["used_extraction_fallback"] = True
         if not verified_bundle.qualitative_evidence:
             raise ValueError(
                 "quiz_refinement returned no verified qualitative evidence"
@@ -656,6 +785,163 @@ class SlidesGenQuizBankService:
         if mode == "train":
             return min(target, 10)
         return target
+
+    def _build_fallback_questions(
+        self,
+        task_spec: TaskSpec,
+        source_pack: SourcePack,
+        *,
+        target_total: int,
+        qualitative_target: int,
+        quantitative_target: int,
+    ) -> list[QuizQuestion]:
+        facts = task_spec.metadata.get("source_facts") or []
+        evidence: list[tuple[str, str, str]] = []
+        for fact in facts:
+            if not isinstance(fact, dict):
+                continue
+            text = fact.get("text")
+            doc_id = fact.get("doc_id")
+            if not isinstance(text, str) or not text.strip():
+                continue
+            if not isinstance(doc_id, str) or not doc_id.strip():
+                doc_id = source_pack.documents[0].doc_id
+            evidence.append(
+                (text.strip(), doc_id.strip(), _source_ref(doc_id.strip(), None))
+            )
+        if not evidence:
+            for document in source_pack.documents:
+                for text in document.pages or [document.text or ""]:
+                    for sentence in re.split(r"(?<=[.!?])\s+", text):
+                        if sentence.strip():
+                            evidence.append(
+                                (
+                                    sentence.strip(),
+                                    document.doc_id,
+                                    _source_ref(document.doc_id, None),
+                                )
+                            )
+        qualitative_evidence = [
+            item for item in evidence if not _NUMBER_PATTERN.search(item[0])
+        ]
+        quantitative_evidence = [
+            item for item in evidence if _NUMBER_PATTERN.search(item[0])
+        ]
+
+        def distractor_statements(
+            correct: str, pool: list[tuple[str, str, str]]
+        ) -> list[str]:
+            options = [item[0] for item in pool if item[0] != correct]
+            options.extend(
+                [
+                    "The source does not mention this.",
+                    "The source describes a different operational goal.",
+                    "The source reports the opposite outcome.",
+                ]
+            )
+            unique: list[str] = []
+            seen: set[str] = set()
+            for option in options:
+                key = option.lower()
+                if key in seen:
+                    continue
+                seen.add(key)
+                unique.append(option)
+                if len(unique) == 3:
+                    break
+            return unique
+
+        all_numbers = [
+            number
+            for text, _, _ in quantitative_evidence
+            for number in _NUMBER_PATTERN.findall(text)
+        ]
+
+        def distractor_numbers(correct: str) -> list[str]:
+            candidates = [value for value in all_numbers if value != correct]
+            candidates.extend(
+                [
+                    f"{int(correct.rstrip('%')) + 1}%"
+                    if correct.endswith("%") and correct.rstrip("%").isdigit()
+                    else "99",
+                    f"{int(correct) + 1}" if correct.isdigit() else "0",
+                    f"{int(correct) - 1}"
+                    if correct.isdigit() and int(correct) > 0
+                    else "1",
+                ]
+            )
+            unique: list[str] = []
+            seen: set[str] = {correct}
+            for candidate in candidates:
+                if candidate in seen:
+                    continue
+                seen.add(candidate)
+                unique.append(candidate)
+                if len(unique) == 3:
+                    break
+            pad_value = 1
+            while len(unique) < 3:
+                candidate = str(pad_value)
+                pad_value += 1
+                if candidate in seen:
+                    continue
+                seen.add(candidate)
+                unique.append(candidate)
+            return unique
+
+        questions: list[QuizQuestion] = []
+        qualitative_pool = (
+            qualitative_evidence
+            or evidence
+            or [
+                (
+                    task_spec.prompt,
+                    source_pack.documents[0].doc_id,
+                    source_pack.documents[0].doc_id,
+                )
+            ]
+        )
+        quantitative_pool = quantitative_evidence or evidence or qualitative_pool
+        for index in range(1, qualitative_target + 1):
+            statement, _, source_ref = qualitative_pool[
+                (index - 1) % len(qualitative_pool)
+            ]
+            options = [
+                statement,
+                *distractor_statements(statement, qualitative_evidence or evidence),
+            ]
+            questions.append(
+                QuizQuestion(
+                    question_id=f"quiz_qualitative_{index:02d}",
+                    question_type="qualitative",
+                    question=f"Which statement is directly supported by {source_ref}?",
+                    options=options[:4],
+                    correct_answer=statement,
+                    explanation=f"The source states this directly in {source_ref}.",
+                    source_refs=[source_ref],
+                    source_quotes=[statement],
+                )
+            )
+        for index in range(1, quantitative_target + 1):
+            statement, _, source_ref = quantitative_pool[
+                (index - 1) % len(quantitative_pool)
+            ]
+            numbers = _NUMBER_PATTERN.findall(statement)
+            correct = numbers[0] if numbers else "0"
+            options = [correct, *distractor_numbers(correct)]
+            questions.append(
+                QuizQuestion(
+                    question_id=f"quiz_quantitative_{index:02d}",
+                    question_type="quantitative",
+                    question=f"Which numeric value is directly stated in {source_ref}?",
+                    options=options[:4],
+                    correct_answer=correct,
+                    explanation=f"The cited value appears in {source_ref}.",
+                    source_refs=[source_ref],
+                    source_quotes=[statement],
+                )
+            )
+        return questions[:target_total]
 
 
 __all__ = [

@@ -4,6 +4,7 @@ from pptx import Presentation
 from server.tools.pptx_tools import (
     create_presentation,
     create_slide,
+    delete_slide,
     register_theme,
     save_presentation,
     update_slide,
@@ -210,6 +211,52 @@ def test_update_slide_can_delete_add_and_update_in_one_call(themed_editor):
     assert str(accent.fill.fore_color.rgb) == "123456"
     assert round(accent.height.inches, 2) == 0.45
     assert updated["named_shapes"]["chart"] in updated["created_shape_ids"]
+
+
+def test_delete_slide_removes_slide_and_returns_metadata(themed_editor):
+    first = create_slide(
+        themed_editor,
+        shapes=[
+            {
+                "type": "text",
+                "name": "title",
+                "text": "First slide",
+                "x": 1,
+                "y": 1,
+                "w": 4,
+                "h": 1,
+            }
+        ],
+    )
+    second = create_slide(
+        themed_editor,
+        shapes=[
+            {
+                "type": "text",
+                "name": "title",
+                "text": "Second slide",
+                "x": 1,
+                "y": 1,
+                "w": 4,
+                "h": 1,
+            }
+        ],
+    )
+
+    deleted = delete_slide(themed_editor, first["slide_id"])
+
+    assert deleted == {
+        "slide_id": first["slide_id"],
+        "deleted_slide_index": 1,
+        "remaining_slide_count": 1,
+    }
+    assert len(themed_editor.prs.slides) == 1
+    assert (
+        slide_for_id(themed_editor, second["slide_id"]).shapes[0].text_frame.text
+        == "Second slide"
+    )
+    with pytest.raises(KeyError):
+        themed_editor.get_slide_index(first["slide_id"])
 
 
 def test_theme_updates_reapply_after_create_slide_and_update_slide(themed_editor):
