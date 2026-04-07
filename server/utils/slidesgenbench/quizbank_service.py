@@ -14,7 +14,7 @@ from server.utils.reward_models import (
     TaskSpec,
     to_serializable,
 )
-from server.utils.reward_prompts import (
+from server.utils.slidesgenbench.prompts import (
     build_quiz_extraction_prompts,
     build_quiz_generation_context,
     build_quiz_generation_prompts,
@@ -60,11 +60,7 @@ def _unique_anchors(anchors: list[QuizAnchor]) -> list[QuizAnchor]:
     seen: set[tuple[str, str, str]] = set()
     unique: list[QuizAnchor] = []
     for anchor in anchors:
-        key = (
-            anchor.anchor_type,
-            anchor.source_ref.lower(),
-            anchor.statement.lower(),
-        )
+        key = (anchor.anchor_type, anchor.source_ref.lower(), anchor.statement.lower())
         if key in seen:
             continue
         seen.add(key)
@@ -102,12 +98,7 @@ def _require_string(raw: dict[str, Any], key: str) -> str:
     return value.strip()
 
 
-def _parse_anchor(
-    raw: Any,
-    *,
-    expected_type: str,
-    default_id: str,
-) -> QuizAnchor:
+def _parse_anchor(raw: Any, *, expected_type: str, default_id: str) -> QuizAnchor:
     if not isinstance(raw, dict):
         raise ValueError("anchor entry must be an object")
     doc_id = _require_string(raw, "doc_id")
@@ -245,18 +236,13 @@ class SlidesGenQuizBankService:
         mode: str = "eval",
     ) -> tuple[list[QuizQuestion], dict[str, Any]]:
         source_context = build_quiz_generation_context(
-            source_pack,
-            max_chunk_chars=self.max_chunk_chars,
+            source_pack, max_chunk_chars=self.max_chunk_chars
         )
         draft_bundle, draft_diagnostics = self._extract_source_truth(
-            task_spec,
-            source_context,
+            task_spec, source_context
         )
         refined_bundle, refine_diagnostics = self._verify_and_refine(
-            task_spec,
-            source_pack,
-            source_context,
-            draft_bundle,
+            task_spec, source_pack, source_context, draft_bundle
         )
 
         target_total = max(2, self._target_question_count(source_pack, mode=mode))
@@ -309,10 +295,7 @@ class SlidesGenQuizBankService:
         for attempt in range(1, self.max_attempts + 1):
             try:
                 payload = self.llm_client.chat_json(
-                    system_prompt,
-                    user_prompt,
-                    temperature=0.0,
-                    max_tokens=max_tokens,
+                    system_prompt, user_prompt, temperature=0.0, max_tokens=max_tokens
                 )
                 if not isinstance(payload, dict):
                     raise ValueError(f"{stage_name} must return a JSON object")
@@ -329,8 +312,7 @@ class SlidesGenQuizBankService:
         source_context,
     ) -> tuple[ExtractionDraft, dict[str, Any]]:
         system_prompt, user_prompt = build_quiz_extraction_prompts(
-            task_spec,
-            source_context,
+            task_spec, source_context
         )
         payload, diagnostics = self._call_stage_json(
             stage_name="quiz_extraction",
@@ -350,10 +332,7 @@ class SlidesGenQuizBankService:
         return draft, diagnostics
 
     def _verify_anchor(
-        self,
-        anchor: QuizAnchor,
-        *,
-        source_texts: dict[str, str],
+        self, anchor: QuizAnchor, *, source_texts: dict[str, str]
     ) -> bool:
         source_text = source_texts.get(anchor.doc_id, "")
         if not source_text:
@@ -377,9 +356,7 @@ class SlidesGenQuizBankService:
         draft_bundle: ExtractionDraft,
     ) -> tuple[RefinedQuizEvidence, dict[str, Any]]:
         system_prompt, user_prompt = build_quiz_refinement_prompts(
-            task_spec,
-            source_context,
-            draft_bundle,
+            task_spec, source_context, draft_bundle
         )
         payload, diagnostics = self._call_stage_json(
             stage_name="quiz_refinement",
@@ -389,7 +366,6 @@ class SlidesGenQuizBankService:
         )
         candidate_bundle = _parse_refined_payload(payload)
         source_texts = _document_source_texts(source_pack)
-
         verified_quantitative = [
             anchor
             for anchor in candidate_bundle.quantitative_anchors
@@ -463,10 +439,7 @@ class SlidesGenQuizBankService:
             raise ValueError("data questions must use a numeric correct answer")
 
     def _build_question_slots(
-        self,
-        *,
-        concept_target: int,
-        data_target: int,
+        self, *, concept_target: int, data_target: int
     ) -> list[dict[str, str]]:
         slots = [
             _question_slot(f"quiz_concept_{index:02d}", "concept")
@@ -517,9 +490,7 @@ class SlidesGenQuizBankService:
                 continue
             try:
                 self._validate_question(
-                    question,
-                    evidence=evidence,
-                    expected_type=expected_type,
+                    question, evidence=evidence, expected_type=expected_type
                 )
                 valid_questions.append(question)
             except Exception as error:
@@ -532,10 +503,12 @@ class SlidesGenQuizBankService:
                 )
 
         valid_ids = {question.question_id for question in valid_questions}
+        failed_ids = {failure["question_id"] for failure in failures}
         for slot in expected_slots:
-            if slot["question_id"] not in valid_ids and slot["question_id"] not in {
-                failure["question_id"] for failure in failures
-            }:
+            if (
+                slot["question_id"] not in valid_ids
+                and slot["question_id"] not in failed_ids
+            ):
                 failures.append(
                     {
                         "question_id": slot["question_id"],
@@ -547,10 +520,7 @@ class SlidesGenQuizBankService:
         return valid_questions, failures, extra_question_ids
 
     def _merge_questions_by_slot(
-        self,
-        *,
-        questions: list[QuizQuestion],
-        expected_slots: list[dict[str, str]],
+        self, *, questions: list[QuizQuestion], expected_slots: list[dict[str, str]]
     ) -> list[QuizQuestion]:
         by_id = {question.question_id: question for question in questions}
         return [by_id[slot["question_id"]] for slot in expected_slots]
@@ -610,8 +580,7 @@ class SlidesGenQuizBankService:
         data_target: int,
     ) -> tuple[GeneratedQuizBankPayload, dict[str, Any]]:
         question_slots = self._build_question_slots(
-            concept_target=concept_target,
-            data_target=data_target,
+            concept_target=concept_target, data_target=data_target
         )
         system_prompt, user_prompt = build_quiz_generation_prompts(
             task_spec,
@@ -626,10 +595,7 @@ class SlidesGenQuizBankService:
         for attempt in range(1, self.max_attempts + 1):
             try:
                 payload = self.llm_client.chat_json(
-                    system_prompt,
-                    user_prompt,
-                    temperature=0.0,
-                    max_tokens=4000,
+                    system_prompt, user_prompt, temperature=0.0, max_tokens=4000
                 )
                 if not isinstance(payload, dict):
                     raise ValueError("quiz_generation must return a JSON object")
@@ -660,12 +626,10 @@ class SlidesGenQuizBankService:
                     valid_questions.extend(repaired_questions)
 
                 final_questions = self._merge_questions_by_slot(
-                    questions=valid_questions,
-                    expected_slots=question_slots,
+                    questions=valid_questions, expected_slots=question_slots
                 )
                 parsed = GeneratedQuizBankPayload(
-                    questions=final_questions,
-                    metadata=metadata,
+                    questions=final_questions, metadata=metadata
                 )
                 diagnostics = {
                     "attempts": attempt,

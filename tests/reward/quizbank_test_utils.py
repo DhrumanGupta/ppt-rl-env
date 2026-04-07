@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import copy
 
-from server.utils.reward_quizbank_service import SlidesGenQuizBankService
+from server.utils.slidesgenbench.quizbank_service import SlidesGenQuizBankService
 
 
 class FakeStructuredLLMClient:

@@ -1,6 +1,6 @@
 from server.tools.pptx_tools import create_slide, register_theme
 from server.utils.pptx_functions import PptxEditor
-from server.utils.reward_inspection import PresentationInspectionService
+from server.utils.pptx_extraction import PptxExtractionService
 from server.utils.reward_kernel import (
     build_eval_spec,
     compute_intermediate_slide_reward,
@@ -284,7 +284,7 @@ def test_build_eval_spec_is_deterministic_and_complete(tmp_path):
     )
 
     assert first.spec_hash == second.spec_hash
-    assert {item.dimension for item in first.checklist} == {
+    assert {item.dimension for item in first.presentbench.checklist} == {
         "fundamentals",
         "visual_layout",
         "completeness",
@@ -296,7 +296,7 @@ def test_build_eval_spec_is_deterministic_and_complete(tmp_path):
         2,
         3,
     ]
-    assert {question.question_type for question in first.quiz_bank} == {
+    assert {question.question_type for question in first.slidesgenbench.quiz_bank} == {
         "concept",
         "data",
     }
@@ -304,7 +304,7 @@ def test_build_eval_spec_is_deterministic_and_complete(tmp_path):
 
 def test_inspection_extracts_supported_shape_kinds():
     editor = make_grounded_editor()
-    inspection = PresentationInspectionService().inspect_presentation(editor)
+    inspection = PptxExtractionService().inspect_presentation(editor)
 
     shape_kinds = {
         shape.shape_kind for slide in inspection.slides for shape in slide.shapes
@@ -348,7 +348,7 @@ def test_grounded_deck_scores_higher_than_hallucinated_deck(tmp_path):
 def test_intermediate_slide_reward_prefers_correct_slot_content(tmp_path):
     source_pack = make_source_pack()
     editor = make_grounded_editor()
-    inspection_service = PresentationInspectionService()
+    inspection_service = PptxExtractionService()
     correct_slide = inspection_service.inspect_slide(2, presentation=editor)
     wrong_slide = inspection_service.inspect_slide(1, presentation=editor)
     correct_service, _ = make_quizbank_service()

@@ -65,9 +65,9 @@ def test_build_eval_spec_uses_injected_quizbank_service():
         quiz_bank_service=StubQuizBankService(),
     )
 
-    assert [question.question_id for question in eval_spec.quiz_bank] == [
-        "quiz_stub_01"
-    ]
+    assert [
+        question.question_id for question in eval_spec.slidesgenbench.quiz_bank
+    ] == ["quiz_stub_01"]
     assert (
         eval_spec.task_spec.metadata["quiz_bank_generation"]["service_name"]
         == "StubQuizBankService"
@@ -82,14 +82,18 @@ def test_explicit_quizbank_service_produces_source_grounded_questions():
         quiz_bank_service=quiz_bank_service,
     )
 
-    assert {question.question_type for question in eval_spec.quiz_bank} == {
+    assert {
+        question.question_type for question in eval_spec.slidesgenbench.quiz_bank
+    } == {
         "concept",
         "data",
     }
     assert len(llm_client.calls) == 3
     assert eval_spec.task_spec.metadata["quiz_bank_generation"]["service_name"]
-    assert all(question.source_refs for question in eval_spec.quiz_bank)
-    assert all(question.source_quotes for question in eval_spec.quiz_bank)
+    assert all(question.source_refs for question in eval_spec.slidesgenbench.quiz_bank)
+    assert all(
+        question.source_quotes for question in eval_spec.slidesgenbench.quiz_bank
+    )
 
 
 def test_quiz_generation_retries_invalid_generation_payload_once():
@@ -106,7 +110,7 @@ def test_quiz_generation_retries_invalid_generation_payload_once():
         quiz_bank_service=quiz_bank_service,
     )
 
-    assert len(eval_spec.quiz_bank) == 10
+    assert len(eval_spec.slidesgenbench.quiz_bank) == 10
     assert len(llm_client.calls) == 4
     assert (
         eval_spec.task_spec.metadata["quiz_bank_generation"]["stage_diagnostics"][
@@ -149,7 +153,7 @@ def test_quiz_generation_repairs_only_failed_subset():
         "stage_diagnostics"
     ]["generation"]
 
-    assert len(eval_spec.quiz_bank) == 10
+    assert len(eval_spec.slidesgenbench.quiz_bank) == 10
     assert len(llm_client.calls) == 4
     assert generation_diagnostics["full_generation_invalid_count"] == 1
     assert generation_diagnostics["repair"]["repaired_question_count"] == 1

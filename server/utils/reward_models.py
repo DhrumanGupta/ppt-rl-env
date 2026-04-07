@@ -59,7 +59,7 @@ class CapabilityProfile:
 
 
 @dataclass(slots=True)
-class TextBlockExtraction:
+class ExtractedTextBlock:
     paragraph_texts: list[str] = field(default_factory=list)
     bullet_levels: list[int | None] = field(default_factory=list)
     font_names: list[str | None] = field(default_factory=list)
@@ -70,7 +70,7 @@ class TextBlockExtraction:
 
 
 @dataclass(slots=True)
-class ChartExtraction:
+class ExtractedChart:
     chart_type: str
     title: str | None = None
     categories: list[str] = field(default_factory=list)
@@ -81,7 +81,7 @@ class ChartExtraction:
 
 
 @dataclass(slots=True)
-class TableExtraction:
+class ExtractedTable:
     rows: int
     cols: int
     cells: list[list[str]] = field(default_factory=list)
@@ -90,7 +90,7 @@ class TableExtraction:
 
 
 @dataclass(slots=True)
-class ImageExtraction:
+class ExtractedImage:
     width_px: int | None = None
     height_px: int | None = None
     content_hash: str | None = None
@@ -98,7 +98,7 @@ class ImageExtraction:
 
 
 @dataclass(slots=True)
-class ShapeExtraction:
+class ExtractedShape:
     shape_id: int
     shape_kind: str
     semantic_role: str | None
@@ -111,15 +111,15 @@ class ShapeExtraction:
     fill_color_hex: str | None = None
     line_color_hex: str | None = None
     raw_text: str | None = None
-    text_blocks: list[TextBlockExtraction] = field(default_factory=list)
-    chart: ChartExtraction | None = None
-    table: TableExtraction | None = None
-    image: ImageExtraction | None = None
+    text_blocks: list[ExtractedTextBlock] = field(default_factory=list)
+    chart: ExtractedChart | None = None
+    table: ExtractedTable | None = None
+    image: ExtractedImage | None = None
     metadata: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass(slots=True)
-class SlideExtraction:
+class ExtractedSlide:
     slide_index: int
     slide_id: int
     layout_name: str | None = None
@@ -127,7 +127,7 @@ class SlideExtraction:
     title_text: str | None = None
     all_text: str = ""
     citations: list[str] = field(default_factory=list)
-    shapes: list[ShapeExtraction] = field(default_factory=list)
+    shapes: list[ExtractedShape] = field(default_factory=list)
     text_metrics: dict[str, Any] = field(default_factory=dict)
     layout_metrics: dict[str, Any] = field(default_factory=dict)
     color_metrics: dict[str, Any] = field(default_factory=dict)
@@ -135,10 +135,10 @@ class SlideExtraction:
 
 
 @dataclass(slots=True)
-class PresentationExtraction:
+class ExtractedPresentation:
     slide_count: int
     slide_ids: list[int] = field(default_factory=list)
-    slides: list[SlideExtraction] = field(default_factory=list)
+    slides: list[ExtractedSlide] = field(default_factory=list)
     # TODO: Remove
     deck_metrics: dict[str, Any] = field(default_factory=dict)
     # TODO: Remove
@@ -263,14 +263,51 @@ class GeneratedQuizBankPayload:
 
 
 @dataclass(slots=True)
-class EvalSpec:
+class PresentBenchEvalSpec:
     task_spec: TaskSpec
     checklist: list[ChecklistItem] = field(default_factory=list)
     slide_checklists: dict[int, list[ChecklistItem]] = field(default_factory=dict)
+    scoring_config: dict[str, Any] = field(default_factory=dict)
+    spec_version: str = "1.0"
+    spec_hash: str = ""
+
+
+@dataclass(slots=True)
+class SlidesGenBenchEvalSpec:
+    task_spec: TaskSpec
     quiz_bank: list[QuizQuestion] = field(default_factory=list)
     scoring_config: dict[str, Any] = field(default_factory=dict)
     spec_version: str = "1.0"
     spec_hash: str = ""
+
+
+@dataclass(slots=True)
+class EvalSpec:
+    task_spec: TaskSpec
+    presentbench: PresentBenchEvalSpec
+    slidesgenbench: SlidesGenBenchEvalSpec
+    scoring_config: dict[str, Any] = field(default_factory=dict)
+    spec_version: str = "1.0"
+    spec_hash: str = ""
+
+
+@dataclass(slots=True)
+class PresentBenchScoreResult:
+    reward_total: float
+    reward_breakdown: dict[str, float] = field(default_factory=dict)
+    hard_caps: dict[str, float] = field(default_factory=dict)
+    soft_penalties: dict[str, float] = field(default_factory=dict)
+    checklist_results: list[dict[str, Any]] = field(default_factory=list)
+    aesthetics_results: dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
+
+
+@dataclass(slots=True)
+class SlidesGenBenchScoreResult:
+    reward_total: float
+    reward_breakdown: dict[str, float] = field(default_factory=dict)
+    quiz_results: list[dict[str, Any]] = field(default_factory=list)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass(slots=True)
@@ -317,13 +354,13 @@ __all__ = [
     "SourcePack",
     "TaskConstraints",
     "CapabilityProfile",
-    "TextBlockExtraction",
-    "ChartExtraction",
-    "TableExtraction",
-    "ImageExtraction",
-    "ShapeExtraction",
-    "SlideExtraction",
-    "PresentationExtraction",
+    "ExtractedTextBlock",
+    "ExtractedChart",
+    "ExtractedTable",
+    "ExtractedImage",
+    "ExtractedShape",
+    "ExtractedSlide",
+    "ExtractedPresentation",
     "PresentationSemanticIndex",
     "RequiredSlideSpec",
     "TaskSpec",
@@ -335,7 +372,11 @@ __all__ = [
     "ExtractionDraft",
     "RefinedQuizEvidence",
     "GeneratedQuizBankPayload",
+    "PresentBenchEvalSpec",
+    "SlidesGenBenchEvalSpec",
     "EvalSpec",
+    "PresentBenchScoreResult",
+    "SlidesGenBenchScoreResult",
     "RewardResult",
     "IntermediateSlideRewardResult",
     "to_serializable",

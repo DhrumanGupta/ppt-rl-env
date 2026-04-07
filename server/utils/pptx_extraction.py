@@ -12,14 +12,14 @@ from pptx.presentation import Presentation as PptxPresentation
 
 from server.utils.pptx_functions import PptxEditor
 from server.utils.reward_models import (
-    ChartExtraction,
-    ImageExtraction,
-    PresentationExtraction,
+    ExtractedChart,
+    ExtractedImage,
+    ExtractedPresentation,
     PresentationSemanticIndex,
-    ShapeExtraction,
-    SlideExtraction,
-    TableExtraction,
-    TextBlockExtraction,
+    ExtractedShape,
+    ExtractedSlide,
+    ExtractedTable,
+    ExtractedTextBlock,
 )
 
 
@@ -30,7 +30,7 @@ _CITATION_PATTERN = re.compile(
 
 
 @dataclass(slots=True)
-class OpenPresentationResult:
+class OpenPptxResult:
     presentation: PptxPresentation
     inspection_mode: str
     source_path: str | None = None
@@ -38,19 +38,19 @@ class OpenPresentationResult:
 
 def open_presentation(
     presentation: PptxEditor | PptxPresentation | str,
-) -> OpenPresentationResult:
+) -> OpenPptxResult:
     if isinstance(presentation, PptxEditor):
-        return OpenPresentationResult(
+        return OpenPptxResult(
             presentation=presentation.prs,
             inspection_mode="pptx_editor",
         )
     if isinstance(presentation, PptxPresentation):
-        return OpenPresentationResult(
+        return OpenPptxResult(
             presentation=presentation,
             inspection_mode="presentation_object",
         )
     if isinstance(presentation, str):
-        return OpenPresentationResult(
+        return OpenPptxResult(
             presentation=load_presentation(presentation),
             inspection_mode="pptx_path",
             source_path=presentation,
@@ -140,8 +140,8 @@ def _infer_text_style(
     return font_name, font_size, bold, italic, color_hex
 
 
-def _extract_text_block(shape: Any) -> TextBlockExtraction:
-    block = TextBlockExtraction()
+def _extract_text_block(shape: Any) -> ExtractedTextBlock:
+    block = ExtractedTextBlock()
     for paragraph in shape.text_frame.paragraphs:
         font_name, font_size, bold, italic, color_hex = _infer_text_style(paragraph)
         block.paragraph_texts.append(paragraph.text)
@@ -161,7 +161,7 @@ def _chart_type_name(chart: Any) -> str:
     return getattr(chart_type, "name", str(chart_type)).lower()
 
 
-def _extract_chart(shape: Any) -> ChartExtraction:
+def _extract_chart(shape: Any) -> ExtractedChart:
     chart = shape.chart
     categories: list[str] = []
     series_payload: list[dict[str, Any]] = []
@@ -211,7 +211,7 @@ def _extract_chart(shape: Any) -> ChartExtraction:
         except Exception:
             series_colors.append(None)
 
-    return ChartExtraction(
+    return ExtractedChart(
         chart_type=_chart_type_name(chart),
         title=title,
         categories=categories,
@@ -222,12 +222,12 @@ def _extract_chart(shape: Any) -> ChartExtraction:
     )
 
 
-def _extract_table(shape: Any) -> TableExtraction:
+def _extract_table(shape: Any) -> ExtractedTable:
     table = shape.table
     cells: list[list[str]] = []
     for row in table.rows:
         cells.append([cell.text for cell in row.cells])
-    return TableExtraction(
+    return ExtractedTable(
         rows=len(table.rows),
         cols=len(table.columns),
         cells=cells,
@@ -236,7 +236,7 @@ def _extract_table(shape: Any) -> TableExtraction:
     )
 
 
-def _extract_image(shape: Any) -> ImageExtraction:
+def _extract_image(shape: Any) -> ExtractedImage:
     image = shape.image
     width_px = None
     height_px = None
@@ -251,7 +251,7 @@ def _extract_image(shape: Any) -> ImageExtraction:
     except Exception:
         content_hash = None
 
-    return ImageExtraction(
+    return ExtractedImage(
         width_px=width_px,
         height_px=height_px,
         content_hash=content_hash,
@@ -306,7 +306,7 @@ def _extract_shape(
     presentation_semantics: PresentationSemanticIndex | None,
     *,
     slide_height_in: float,
-) -> ShapeExtraction:
+) -> ExtractedShape:
     shape_kind, inferred_role = _shape_kind(shape, slide_height_in)
     raw_text = (
         shape.text_frame.text if getattr(shape, "has_text_frame", False) else None
@@ -325,7 +325,7 @@ def _extract_shape(
     if _has_image(shape):
         image = _extract_image(shape)
 
-    return ShapeExtraction(
+    return ExtractedShape(
         shape_id=shape.shape_id,
         shape_kind=shape_kind,
         semantic_role=_semantic_role(
@@ -355,14 +355,14 @@ def _extract_shape(
     )
 
 
-def _title_from_shapes(shapes: list[ShapeExtraction]) -> str | None:
+def _title_from_shapes(shapes: list[ExtractedShape]) -> str | None:
     text_shapes = [
         shape for shape in shapes if shape.shape_kind == "text" and shape.raw_text
     ]
     if not text_shapes:
         return None
 
-    def score(shape: ShapeExtraction) -> tuple[float, float, float]:
+    def score(shape: ExtractedShape) -> tuple[float, float, float]:
         font_sizes = [
             size
             for block in shape.text_blocks
@@ -376,7 +376,7 @@ def _title_from_shapes(shapes: list[ShapeExtraction]) -> str | None:
     return best_shape.raw_text
 
 
-def _shape_texts(shapes: list[ShapeExtraction]) -> list[str]:
+def _shape_texts(shapes: list[ExtractedShape]) -> list[str]:
     texts = []
     for shape in shapes:
         if shape.raw_text:
@@ -394,7 +394,7 @@ def _shape_texts(shapes: list[ShapeExtraction]) -> list[str]:
     return [text for text in texts if text]
 
 
-def _font_metrics(shapes: list[ShapeExtraction]) -> dict[str, Any]:
+def _font_metrics(shapes: list[ExtractedShape]) -> dict[str, Any]:
     font_sizes = [
         size
         for shape in shapes
@@ -419,7 +419,7 @@ def _font_metrics(shapes: list[ShapeExtraction]) -> dict[str, Any]:
 
 
 def _layout_metrics(
-    shapes: list[ShapeExtraction],
+    shapes: list[ExtractedShape],
     *,
     slide_width: float,
     slide_height: float,
@@ -438,7 +438,7 @@ def _layout_metrics(
     }
 
 
-def _color_metrics(slide: Any, shapes: list[ShapeExtraction]) -> dict[str, Any]:
+def _color_metrics(slide: Any, shapes: list[ExtractedShape]) -> dict[str, Any]:
     palette = [
         color
         for color in [
@@ -466,13 +466,13 @@ def presentation_digest(presentation: PptxPresentation) -> str:
     return hashlib.sha256(payload.getvalue()).hexdigest()
 
 
-class PresentationInspectionService:
+class PptxExtractionService:
     def inspect_presentation(
         self,
         presentation: PptxEditor | PptxPresentation | str,
         *,
         presentation_semantics: PresentationSemanticIndex | None = None,
-    ) -> PresentationExtraction:
+    ) -> ExtractedPresentation:
         opened = open_presentation(presentation)
         slides = []
         for slide_index, slide in enumerate(opened.presentation.slides, start=1):
@@ -491,7 +491,7 @@ class PresentationInspectionService:
             if color
         )
 
-        return PresentationExtraction(
+        return ExtractedPresentation(
             slide_count=len(slides),
             slide_ids=[slide.slide_id for slide in slides],
             slides=slides,
@@ -524,7 +524,7 @@ class PresentationInspectionService:
         *,
         presentation: PptxEditor | PptxPresentation,
         presentation_semantics: PresentationSemanticIndex | None = None,
-    ) -> SlideExtraction:
+    ) -> ExtractedSlide:
         opened = open_presentation(presentation)
         if slide_index < 1 or slide_index > len(opened.presentation.slides):
             raise IndexError(f"Slide index {slide_index} out of range")
@@ -562,7 +562,7 @@ class PresentationInspectionService:
         if not title_text:
             title_text = _title_from_shapes(shapes)
 
-        return SlideExtraction(
+        return ExtractedSlide(
             slide_index=slide_index,
             slide_id=slide.slide_id,
             layout_name=getattr(slide.slide_layout, "name", None),
@@ -588,8 +588,8 @@ class PresentationInspectionService:
 
 
 __all__ = [
-    "OpenPresentationResult",
-    "PresentationInspectionService",
+    "OpenPptxResult",
+    "PptxExtractionService",
     "open_presentation",
     "presentation_digest",
 ]
