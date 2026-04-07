@@ -26,6 +26,9 @@ from server.utils.reward_models import (
 )
 from server.utils.reward_prompts import build_task_spec
 from server.utils.slidesgenbench.quizbank_service import QuizBankGenerationService
+from server.utils.slidesgenbench.quantitative_judge import (
+    QuantitativeQuizJudgeService,
+)
 from server.utils.slidesgenbench.scoring import score_slidesgenbench
 from server.utils.slidesgenbench.spec_builder import build_slidesgenbench_eval_spec
 
@@ -153,6 +156,7 @@ def evaluate_presentation(
     render_service: Any | None = None,
     inspection_service: PptxExtractionService | None = None,
     aesthetics_service: Any | None = None,
+    quantitative_quiz_judge_service: QuantitativeQuizJudgeService,
     mode: str = "eval",
 ) -> RewardResult:
     del judge, render_service
@@ -173,6 +177,7 @@ def evaluate_presentation(
         eval_spec.task_spec,
         presentation_extraction,
         eval_spec.slidesgenbench,
+        quantitative_quiz_judge_service=quantitative_quiz_judge_service,
     )
 
     branch_weights = eval_spec.scoring_config["branch_weights"]
@@ -295,6 +300,7 @@ def compute_presentation_reward(
     inspection_service: PptxExtractionService | None = None,
     aesthetics_service: Any | None = None,
     quiz_bank_service: QuizBankGenerationService,
+    quantitative_quiz_judge_service: QuantitativeQuizJudgeService,
     cache_dir: str | None = None,
     mode: str = "eval",
 ) -> RewardResult:
@@ -314,6 +320,7 @@ def compute_presentation_reward(
         render_service=render_service,
         inspection_service=inspection_service,
         aesthetics_service=aesthetics_service,
+        quantitative_quiz_judge_service=quantitative_quiz_judge_service,
         mode=mode,
     )
 

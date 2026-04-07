@@ -2,7 +2,12 @@ from __future__ import annotations
 
 import copy
 
+from server.utils.reward_metrics import deck_text_corpus
+from server.utils.reward_models import ExtractedPresentation, QuizQuestion
 from server.utils.slidesgenbench.quizbank_service import SlidesGenQuizBankService
+from server.utils.slidesgenbench.quantitative_judge import (
+    SlidesGenQuantitativeJudgeService,
+)
 
 
 class FakeLLMClient:
@@ -285,3 +290,50 @@ def make_quizbank_service(
 ) -> tuple[SlidesGenQuizBankService, FakeLLMClient]:
     client = FakeLLMClient(responses or build_valid_quizbank_stage_responses())
     return SlidesGenQuizBankService(client), client
+
+
+def build_valid_quantitative_judge_response() -> dict:
+    generation_payload = build_valid_quizbank_stage_responses()[2]
+    answers = []
+    for question in generation_payload["questions"]:
+        if question["question_type"] != "quantitative":
+            continue
+        answers.append(
+            {
+                "question_id": question["question_id"],
+                "selected_answer": question["correct_answer"],
+                "reasoning": "Supported by the deck context.",
+            }
+        )
+    return {"answers": answers, "metadata": {"stage": "quantitative_judge"}}
+
+
+def make_quantitative_judge_service(
+    responses: list[dict] | None = None,
+) -> tuple[SlidesGenQuantitativeJudgeService, FakeLLMClient]:
+    client = FakeLLMClient(responses or [build_valid_quantitative_judge_response()])
+    return SlidesGenQuantitativeJudgeService(client), client
+
+
+class DeterministicQuantitativeJudgeService:
+    def judge_quantitative_questions(
+        self,
+        *,
+        task_spec,
+        presentation_extraction: ExtractedPresentation,
+        questions: list[QuizQuestion],
+    ) -> tuple[dict[str, dict[str, str]], dict[str, int]]:
+        del task_spec
+        deck_text = deck_text_corpus(presentation_extraction)
+        answers: dict[str, dict[str, str]] = {}
+        for question in questions:
+            selected_answer = (
+                question.correct_answer
+                if question.correct_answer in deck_text
+                else question.options[0]
+            )
+            answers[question.question_id] = {
+                "selected_answer": selected_answer,
+                "reasoning": "deterministic quantitative answer matching",
+            }
+        return answers, {"question_count": len(questions)}

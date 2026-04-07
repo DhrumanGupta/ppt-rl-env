@@ -7,14 +7,16 @@ from server.utils.reward_models import (
     SlidesGenBenchScoreResult,
     TaskSpec,
 )
+from server.utils.slidesgenbench.quantitative_judge import QuantitativeQuizJudgeService
 
 
 def score_slidesgenbench(
     task_spec: TaskSpec,
     presentation_extraction: ExtractedPresentation,
     eval_spec: SlidesGenBenchEvalSpec,
+    *,
+    quantitative_quiz_judge_service: QuantitativeQuizJudgeService,
 ) -> SlidesGenBenchScoreResult:
-    del task_spec
     deck_text = "\n".join(
         slide_text_corpus(slide) for slide in presentation_extraction.slides
     )
@@ -23,24 +25,49 @@ def score_slidesgenbench(
     qualitative_total = 0
     quantitative_correct = 0
     quantitative_total = 0
+    quantitative_answers: dict[str, dict[str, object]] = {}
+    quantitative_questions = [
+        question
+        for question in eval_spec.quiz_bank
+        if question.question_type == "quantitative"
+    ]
+    judge_metadata: dict[str, object] = {}
+
+    if quantitative_questions:
+        try:
+            quantitative_answers, judge_metadata = (
+                quantitative_quiz_judge_service.judge_quantitative_questions(
+                    task_spec=task_spec,
+                    presentation_extraction=presentation_extraction,
+                    questions=quantitative_questions,
+                )
+            )
+        except Exception as error:
+            judge_metadata = {"error": str(error)}
 
     for question in eval_spec.quiz_bank:
+        selected_answer: str | None = None
+        reasoning = "deterministic slides-only answer matching"
         correct = False
         if question.question_type == "quantitative":
             quantitative_total += 1
-            correct = question.correct_answer in deck_text
+            answer = quantitative_answers.get(question.question_id, {})
+            selected_answer = answer.get("selected_answer")
+            reasoning = answer.get("reasoning") or "llm quantitative deck answer"
+            correct = selected_answer == question.correct_answer
             quantitative_correct += int(correct)
         else:
             qualitative_total += 1
             correct = text_match_score(deck_text, question.correct_answer) >= 0.6
+            selected_answer = question.correct_answer if correct else None
             qualitative_correct += int(correct)
         quiz_results.append(
             {
                 "question_id": question.question_id,
                 "question_type": question.question_type,
-                "selected_answer": question.correct_answer if correct else None,
+                "selected_answer": selected_answer,
                 "correct": correct,
-                "reasoning": "deterministic slides-only answer matching",
+                "reasoning": reasoning,
             }
         )
 
@@ -71,6 +98,7 @@ def score_slidesgenbench(
             "question_count": len(eval_spec.quiz_bank),
             "slide_count": presentation_extraction.slide_count,
             "spec_hash": eval_spec.spec_hash,
+            "quantitative_judge": judge_metadata,
         },
     )
 

@@ -3,8 +3,11 @@ from __future__ import annotations
 import json
 import re
 
+from server.utils.reward_metrics import slide_text_corpus
 from server.utils.reward_models import (
+    ExtractedPresentation,
     QuizEvidenceBundle,
+    QuizQuestion,
     SourcePack,
     TaskSpec,
     to_serializable,
@@ -121,8 +124,8 @@ def build_quiz_extraction_prompts(
     source_context: str,
 ) -> tuple[str, str]:
     system_prompt = (
-        "You are a Forensic Analyst building a source-grounded quiz bank for SlidesGenBench "
-        "evaluation. Return strict JSON only. Extract evidence only when directly supported by "
+        "You are a forensic analyst building a source-grounded quiz bank from reference "
+        "materials. Return strict JSON only. Extract evidence only when directly supported by "
         "the provided source text. Every evidence item must include evidence_id, statement, "
         "source_quote, source_ref, doc_id, page, and metadata. Put numeric facts in "
         "quantitative_evidence and non-numeric factual claims in qualitative_evidence."
@@ -150,7 +153,7 @@ def build_quiz_refinement_prompts(
     evidence_bundle: QuizEvidenceBundle,
 ) -> tuple[str, str]:
     system_prompt = (
-        "You are a Strict Editor refining extracted quiz evidence for SlidesGenBench. Return "
+        "You are a strict editor refining extracted quiz evidence. Return "
         "strict JSON only. Keep only verified, high-value evidence. Remove duplicates, vague "
         "statements, and unsupported claims. Preserve exact source quotes and source locations."
     )
@@ -182,8 +185,8 @@ def build_quiz_generation_prompts(
 ) -> tuple[str, str]:
     slot_json = json.dumps(question_slots, indent=2, sort_keys=True)
     system_prompt = (
-        "You are a Professional Exam Setter. Return strict JSON only. Build a source-grounded "
-        "multiple-choice quiz for slides-only open-book SlidesGenBench evaluation. Every "
+        "You are a professional exam setter. Return strict JSON only. Build a source-grounded "
+        "multiple-choice quiz for a slides-only open-book task. Every "
         "question must have exactly 4 distinct options, one correct answer using the option "
         "text itself, an explanation, source_refs, and source_quotes. Do not emit commentary, "
         "markdown, or keys outside the requested schema."
@@ -221,7 +224,7 @@ def build_quiz_regeneration_prompts(
     preserved_questions: list[dict[str, object]],
 ) -> tuple[str, str]:
     system_prompt = (
-        "You are a Professional Exam Setter repairing only invalid SlidesGenBench quiz "
+        "You are a professional exam setter repairing only invalid quiz "
         "questions. Return strict JSON only. Regenerate only the requested failed slots and "
         "preserve the exact question_id and question_type for each repaired question."
     )
@@ -249,10 +252,58 @@ def build_quiz_regeneration_prompts(
     return system_prompt, user_prompt
 
 
+def build_quantitative_quiz_judging_prompts(
+    task_spec: TaskSpec,
+    presentation_extraction: ExtractedPresentation,
+    questions: list[QuizQuestion],
+    *,
+    max_slide_chars: int = 1200,
+) -> tuple[str, str]:
+    sections: list[str] = []
+    for slide in presentation_extraction.slides:
+        content = slide_text_corpus(slide).strip()
+        if len(content) > max_slide_chars:
+            content = content[: max_slide_chars - 3].rstrip() + "..."
+        sections.append(
+            "\n".join(
+                [
+                    f"[SLIDE {slide.slide_index}]",
+                    f"title: {slide.title_text or ''}",
+                    "content:",
+                    content,
+                ]
+            )
+        )
+    deck_context = "\n\n".join(sections)
+
+    system_prompt = (
+        "You are a strict quantitative quiz grader. Return strict JSON "
+        "only. Answer each multiple-choice question using only the deck context. For each "
+        "question, selected_answer must exactly match one provided option string."
+    )
+    user_prompt = (
+        f"Task prompt:\n{task_spec.prompt}\n\n"
+        "Return JSON with this exact top-level shape:\n"
+        '{"answers": [{"question_id": "...", "selected_answer": "...", '
+        '"reasoning": "..."}], "metadata": {...}}\n\n'
+        "Requirements:\n"
+        "- Answer every question exactly once.\n"
+        "- selected_answer must exactly equal one provided option.\n"
+        "- Use only the deck context below.\n"
+        "- Do not leave any question unanswered.\n\n"
+        "Quantitative questions JSON:\n"
+        f"{json.dumps(to_serializable(questions), indent=2, sort_keys=True)}\n\n"
+        "Deck context:\n"
+        f"{deck_context}"
+    )
+    return system_prompt, user_prompt
+
+
 __all__ = [
     "build_quiz_source_context",
     "build_quiz_extraction_prompts",
     "build_quiz_generation_prompts",
+    "build_quantitative_quiz_judging_prompts",
     "build_quiz_regeneration_prompts",
     "build_quiz_refinement_prompts",
 ]
