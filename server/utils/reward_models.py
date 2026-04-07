@@ -148,6 +148,25 @@ class ExtractedPresentation:
 
 
 @dataclass(slots=True)
+class RenderedSlideImage:
+    slide_index: int
+    image_path: str
+    width_px: int
+    height_px: int
+    content_hash: str | None = None
+    metadata: dict[str, Any] = field(default_factory=dict)
+
+
+@dataclass(slots=True)
+class RenderedPresentation:
+    slide_images: list[RenderedSlideImage] = field(default_factory=list)
+    pptx_path: str | None = None
+    pdf_path: str | None = None
+    backend: str = ""
+    metadata: dict[str, Any] = field(default_factory=dict)
+
+
+@dataclass(slots=True)
 class RequiredSlideSpec:
     slide_index: int
     slide_role: str
@@ -322,6 +341,8 @@ __all__ = [
     "ExtractedShape",
     "ExtractedSlide",
     "ExtractedPresentation",
+    "RenderedSlideImage",
+    "RenderedPresentation",
     "RequiredSlideSpec",
     "TaskSpec",
     "ChecklistItem",
