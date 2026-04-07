@@ -7,7 +7,12 @@ import numpy as np
 from PIL import Image
 
 from server.utils.reward_metrics import clamp, compute_overlap_ratio
-from server.utils.reward_models import ExtractedPresentation, RenderedPresentation
+from server.utils.reward_models import (
+    ExtractedPresentation,
+    ExtractedSlide,
+    RenderedPresentation,
+    RenderedSlideImage,
+)
 
 
 def _load_rgb(path: str) -> np.ndarray:
@@ -524,4 +529,124 @@ def compute_rendered_aesthetics_scores(
     }
 
 
-__all__ = ["compute_rendered_aesthetics_scores"]
+def compute_intermediate_rendered_aesthetics_score(
+    *,
+    current_slide: ExtractedSlide,
+    current_rendered_slide: RenderedSlideImage,
+    previous_slide: ExtractedSlide | None,
+    previous_rendered_slide: RenderedSlideImage | None,
+    slide_width_in: float,
+    slide_height_in: float,
+    metric_weights: dict[str, float] | None = None,
+    harmony_config: dict[str, Any] | None = None,
+    rhythm_config: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    weights = metric_weights or {
+        "harmony": 0.20,
+        "engagement": 0.20,
+        "usability": 0.35,
+        "rhythm": 0.25,
+    }
+    harmony_config = harmony_config or {
+        "saturation_threshold": 0.1,
+        "downsample_max_side": 256,
+        "rotation_steps": 72,
+        "gaussian_sigma_degrees": 28.0,
+    }
+    rhythm_config = rhythm_config or {
+        "downsample_max_side": 256,
+        "entropy_bins": 32,
+        "luminance_weight": 0.84,
+        "chroma_weight": 0.08,
+        "rmssd_target": 0.12,
+        "rmssd_spread": 0.08,
+        "overload_threshold": 0.82,
+        "overload_penalty_weight": 0.15,
+    }
+
+    current_rgb = _load_rgb(current_rendered_slide.image_path)
+    current_harmony, harmony_details = _slide_harmony_score(
+        current_rgb,
+        saturation_threshold=float(harmony_config.get("saturation_threshold", 0.1)),
+        rotation_steps=int(harmony_config.get("rotation_steps", 72)),
+        gaussian_sigma_degrees=float(
+            harmony_config.get("gaussian_sigma_degrees", 28.0)
+        ),
+        downsample_max_side=int(harmony_config.get("downsample_max_side", 256)),
+    )
+    current_engagement = _normalized_colorfulness_score(_colorfulness(current_rgb))
+    current_usability, usability_details = _slide_usability(
+        current_rgb,
+        current_slide,
+        slide_width_in=slide_width_in,
+        slide_height_in=slide_height_in,
+    )
+    current_entropy, entropy_details = _subband_entropy_score(
+        current_rgb,
+        downsample_max_side=int(rhythm_config.get("downsample_max_side", 256)),
+        bins=int(rhythm_config.get("entropy_bins", 32)),
+        luminance_weight=float(rhythm_config.get("luminance_weight", 0.84)),
+        chroma_weight=float(rhythm_config.get("chroma_weight", 0.08)),
+    )
+
+    sequence_scores = [current_entropy]
+    previous_entropy = None
+    if previous_rendered_slide is not None and previous_slide is not None:
+        previous_rgb = _load_rgb(previous_rendered_slide.image_path)
+        previous_entropy, _previous_entropy_details = _subband_entropy_score(
+            previous_rgb,
+            downsample_max_side=int(rhythm_config.get("downsample_max_side", 256)),
+            bins=int(rhythm_config.get("entropy_bins", 32)),
+            luminance_weight=float(rhythm_config.get("luminance_weight", 0.84)),
+            chroma_weight=float(rhythm_config.get("chroma_weight", 0.08)),
+        )
+        sequence_scores.insert(0, previous_entropy)
+    complexity_rmssd = _sequence_rmssd(sequence_scores)
+    if len(sequence_scores) == 1:
+        current_rhythm = 0.5
+    else:
+        overload_threshold = float(rhythm_config.get("overload_threshold", 0.82))
+        overload_penalty = min(
+            sum(1 for value in sequence_scores if value > overload_threshold)
+            / len(sequence_scores),
+            1.0,
+        )
+        overload_weight = float(rhythm_config.get("overload_penalty_weight", 0.15))
+        rhythm_variation = _paced_variation_score(
+            complexity_rmssd,
+            target=float(rhythm_config.get("rmssd_target", 0.12)),
+            spread=float(rhythm_config.get("rmssd_spread", 0.08)),
+        )
+        current_rhythm = clamp(
+            (1.0 - overload_weight) * rhythm_variation
+            + overload_weight * (1.0 - overload_penalty)
+        )
+
+    aesthetic = clamp(
+        weights.get("harmony", 0.20) * current_harmony
+        + weights.get("engagement", 0.20) * current_engagement
+        + weights.get("usability", 0.35) * current_usability
+        + weights.get("rhythm", 0.25) * current_rhythm
+    )
+    return {
+        "aesthetic": aesthetic,
+        "harmony": current_harmony,
+        "engagement": current_engagement,
+        "usability": current_usability,
+        "rhythm": current_rhythm,
+        "available": True,
+        "backend": "rendered-slide-local",
+        "slide_index": current_slide.slide_index,
+        "current_entropy": current_entropy,
+        "previous_entropy": previous_entropy,
+        "complexity_rmssd": complexity_rmssd,
+        **harmony_details,
+        **entropy_details,
+        **usability_details,
+    }
+
+
+__all__ = [
+    "compute_intermediate_rendered_aesthetics_score",
+    "compute_rendered_aesthetics_scores",
+]

@@ -31,8 +31,12 @@ from server.utils.slidesgenbench.quantitative_judge import (
 )
 from server.utils.slidesgenbench.scoring import score_slidesgenbench
 from server.utils.slidesgenbench.spec_builder import build_slidesgenbench_eval_spec
+from server.utils.slidesgenbench.rendered_aesthetics import (
+    compute_intermediate_rendered_aesthetics_score,
+)
 
 SPEC_VERSION = "1.0"
+INTERMEDIATE_SLIDESGENBENCH_AESTHETIC_WEIGHT = 0.25
 
 DEFAULT_REWARD_KERNEL_CONFIG: dict[str, Any] = {
     "branch_weights": {"presentbench": 0.6, "slidesgenbench": 0.4},
@@ -262,7 +266,7 @@ def evaluate_slide(
     previous_slide_extractions: list[ExtractedSlide] | None = None,
     mode: str = "eval",
 ) -> IntermediateSlideRewardResult:
-    del judge, render_service, aesthetics_service
+    del judge, aesthetics_service
     inspection_service = inspection_service or PptxExtractionService()
     try:
         if slide_extraction is None:
@@ -299,7 +303,7 @@ def evaluate_slide(
             },
         )
 
-    return score_presentbench_slide(
+    presentbench_result = score_presentbench_slide(
         eval_spec.task_spec,
         eval_spec.presentbench,
         slide_index,
@@ -307,6 +311,98 @@ def evaluate_slide(
         previous_slide_extractions=previous_slide_extractions,
         use_mllm=use_mllm,
         mode=mode,
+    )
+
+    rendered_aesthetics: dict[str, Any] = {}
+    render_error: str | None = None
+    if (
+        presentation is not None
+        and render_service
+        and hasattr(render_service, "render_presentation")
+    ):
+        try:
+            rendered_presentation = render_service.render_presentation(presentation)
+            rendered_slide_map = {
+                slide.slide_index: slide for slide in rendered_presentation.slide_images
+            }
+            current_rendered_slide = rendered_slide_map.get(slide_index)
+            if current_rendered_slide is None:
+                raise ValueError(
+                    f"missing rendered slide for slide_index {slide_index}"
+                )
+
+            previous_slide = None
+            previous_rendered_slide = None
+            if slide_index > 1:
+                previous_rendered_slide = rendered_slide_map.get(slide_index - 1)
+                if previous_rendered_slide is None:
+                    raise ValueError(
+                        f"missing rendered previous slide for slide_index {slide_index - 1}"
+                    )
+                if previous_slide_extractions:
+                    previous_slide = previous_slide_extractions[-1]
+                else:
+                    previous_slide = inspection_service.inspect_slide(
+                        slide_index - 1,
+                        presentation=presentation,
+                    )
+
+            rendered_aesthetics = compute_intermediate_rendered_aesthetics_score(
+                current_slide=slide_extraction,
+                current_rendered_slide=current_rendered_slide,
+                previous_slide=previous_slide,
+                previous_rendered_slide=previous_rendered_slide,
+                slide_width_in=float(
+                    slide_extraction.metadata.get("slide_width_in") or 0.0
+                ),
+                slide_height_in=float(
+                    slide_extraction.metadata.get("slide_height_in") or 0.0
+                ),
+                metric_weights=eval_spec.slidesgenbench.scoring_config.get(
+                    "aesthetic_weights"
+                ),
+                harmony_config=eval_spec.slidesgenbench.scoring_config.get(
+                    "harmony_config"
+                ),
+                rhythm_config=eval_spec.slidesgenbench.scoring_config.get(
+                    "rhythm_config"
+                ),
+            )
+        except Exception as error:
+            render_error = str(error)
+
+    s_slide_aesthetic = float(rendered_aesthetics.get("aesthetic", 0.0))
+    weight = INTERMEDIATE_SLIDESGENBENCH_AESTHETIC_WEIGHT
+    reward_total = clamp(
+        (1.0 - weight) * presentbench_result.reward_total + weight * s_slide_aesthetic
+    )
+    reward_breakdown = {
+        **presentbench_result.reward_breakdown,
+        "R_slide_presentbench": presentbench_result.reward_total,
+        "S_slide_aesthetic": s_slide_aesthetic,
+        "S_slide_harmony": float(rendered_aesthetics.get("harmony", 0.0)),
+        "S_slide_engagement": float(rendered_aesthetics.get("engagement", 0.0)),
+        "S_slide_usability_rendered": float(rendered_aesthetics.get("usability", 0.0)),
+        "S_slide_rhythm": float(rendered_aesthetics.get("rhythm", 0.0)),
+        "R_slide": reward_total,
+    }
+    metadata = {
+        **presentbench_result.metadata,
+        "render_backend": rendered_aesthetics.get("backend"),
+        "render_error": render_error,
+        "used_rendered_slide_aesthetics": bool(rendered_aesthetics),
+        "intermediate_slidesgenbench_aesthetic_weight": weight,
+    }
+    return IntermediateSlideRewardResult(
+        slide_index=presentbench_result.slide_index,
+        reward_total=reward_total,
+        reward_breakdown=reward_breakdown,
+        hard_caps=presentbench_result.hard_caps,
+        soft_penalties=presentbench_result.soft_penalties,
+        checklist_results=presentbench_result.checklist_results,
+        aesthetics_results=rendered_aesthetics,
+        artifacts=presentbench_result.artifacts,
+        metadata=metadata,
     )
 
 
