@@ -1,27 +1,36 @@
-# Copyright (c) Meta Platforms, Inc. and affiliates.
-# All rights reserved.
-#
-# This source code is licensed under the BSD-style license found in the
-# LICENSE file in the root directory of this source tree.
+from __future__ import annotations
 
-"""
-Data models for the Ppt Agent Environment.
-
-The ppt_agent environment is a simple test environment that echoes back messages.
-"""
+from typing import Any, Literal
 
 from openenv.core.env_server.types import Action, Observation
 from pydantic import Field
 
 
 class PptAgentAction(Action):
-    """Action for the Ppt Agent environment - just a message to echo."""
+    """Structured action for the prompt-to-PPT environment skeleton."""
 
-    message: str = Field(..., description="Message to echo back")
+    action_type: Literal["create_slide", "update_slide"] = Field(
+        ..., description="Macro action to execute"
+    )
+    slide_index: int | None = Field(
+        default=None,
+        ge=1,
+        description="Target slide index using 1-based indexing",
+    )
+    payload: dict[str, Any] = Field(
+        default_factory=dict,
+        description="Action-specific arguments for the macro action",
+    )
 
 
 class PptAgentObservation(Observation):
-    """Observation from the Ppt Agent environment - the echoed message."""
+    """Observation for the prompt-to-PPT environment skeleton."""
 
-    echoed_message: str = Field(default="", description="The echoed message")
-    message_length: int = Field(default=0, description="Length of the echoed message")
+    task_name: str = Field(default="", description="Current task identifier")
+    slide_count: int = Field(default=0, ge=0, description="Current number of slides")
+    last_action_error: str | None = Field(
+        default=None,
+        description="Last action validation or execution error",
+    )
+    score: float = Field(default=0.0, ge=0.0, le=1.0, description="Normalized score")
+    prompt_summary: str = Field(default="", description="Current prompt summary")
