@@ -38,7 +38,7 @@ except Exception as e:  # pragma: no cover
 try:
     from ..models import PptAgentAction, PptAgentObservation
     from .ppt_agent_environment import PptAgentEnvironment
-except ModuleNotFoundError:
+except ImportError:
     from models import PptAgentAction, PptAgentObservation
     from server.ppt_agent_environment import PptAgentEnvironment
 
@@ -49,7 +49,7 @@ app = create_app(
     PptAgentAction,
     PptAgentObservation,
     env_name="ppt_agent",
-    max_concurrent_envs=1,  # increase this number to allow more concurrent WebSocket sessions
+    max_concurrent_envs=4,
 )
 
 
@@ -76,9 +76,4 @@ def main(host: str = "0.0.0.0", port: int = 8000):
 
 
 if __name__ == "__main__":
-    import argparse
-
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--port", type=int, default=8000)
-    args = parser.parse_args()
-    main(port=args.port)
+    main()
