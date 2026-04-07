@@ -125,6 +125,10 @@ def is_blank_or_title_only(slide: ExtractedSlide) -> bool:
         len(non_citation_texts) == 1
         and slide.title_text
         and non_citation_texts[0] == slide.title_text
+        and not any(
+            shape.shape_kind in {"chart", "table", "image"}
+            for shape in slide.shapes
+        )
     ):
         return True
     return False
