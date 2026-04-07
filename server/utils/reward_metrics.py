@@ -68,38 +68,27 @@ def _similarity_model():
 
 
 def _parse_numeric_value(raw: str) -> float | None:
-    """Parse a numeric string into a canonical float.
-
-    Handles commas, currency symbols, percentage signs, and magnitude
-    suffixes (e.g. "1.2M", "$3,400", "25%", "2 billion").
-    """
-    cleaned = raw.strip().lstrip("$\u00a3\u20ac")
-    cleaned = cleaned.replace(",", "")
+    """Parse a numeric string to a canonical float, handling commas,
+    currency symbols, %, and magnitude suffixes (M/million/B/etc)."""
+    cleaned = raw.strip().lstrip("$\u00a3\u20ac").replace(",", "")
+    is_percent = cleaned.endswith("%")
+    if is_percent:
+        cleaned = cleaned[:-1]
     magnitude = 1
     for suffix, factor in _MAGNITUDE_MAP.items():
         if cleaned.lower().endswith(suffix):
             cleaned = cleaned[: -len(suffix)].rstrip()
             magnitude = factor
             break
-    is_percent = cleaned.endswith("%")
-    if is_percent:
-        cleaned = cleaned[:-1]
     try:
-        value = float(cleaned) * magnitude
+        return float(cleaned) * magnitude
     except ValueError:
         return None
-    if is_percent:
-        value = round(value, 6)
-    return value
 
 
 def normalized_number_match(candidate_text: str, target: str) -> bool:
-    """Check if *target* numeric value appears in *candidate_text*.
-
-    Uses word-boundary-aware extraction and canonical float comparison
-    to avoid false positives (e.g. "25%" inside "125%") and false
-    negatives (e.g. "1,234" vs "1234", "$5.2M" vs "5.2 million").
-    """
+    """Word-boundary-aware numeric match: "25%" won't match inside "125%",
+    but "1,234" will match "1234" and "$5.2M" will match "5.2 million"."""
     target_val = _parse_numeric_value(target)
     if target_val is None:
         return target in candidate_text

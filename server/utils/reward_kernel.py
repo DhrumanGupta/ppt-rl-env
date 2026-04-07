@@ -177,23 +177,20 @@ def evaluate_presentation(
         aesthetics_service=aesthetics_service,
     )
 
-    # --- Hard caps: merge PresentBench caps with editability cap ---
+    # --- Hard caps: PresentBench already applies its own C_hard internally,
+    # so we only apply the editability cap at the kernel level. ---
     hard_caps = dict(presentbench_result.hard_caps)
     pei_level = slidesgenbench_result.editability_results.get("pei_level", 0)
     required_pei = eval_spec.scoring_config.get("required_pei_level", 3)
     c_editability_req = 0.7 if pei_level < required_pei else 1.0
     hard_caps["C_editability_req"] = c_editability_req
-    c_hard_pb = hard_caps.get("C_hard", 1.0)
-    hard_caps["C_hard"] = min(c_hard_pb, c_editability_req)
 
     branch_weights = eval_spec.scoring_config["branch_weights"]
-    reward_total = clamp(
-        hard_caps["C_hard"]
-        * (
-            branch_weights["presentbench"] * presentbench_result.reward_total
-            + branch_weights["slidesgenbench"] * slidesgenbench_result.reward_total
-        )
+    raw_total = (
+        branch_weights["presentbench"] * presentbench_result.reward_total
+        + branch_weights["slidesgenbench"] * slidesgenbench_result.reward_total
     )
+    reward_total = clamp(c_editability_req * raw_total)
 
     return RewardResult(
         reward_total=reward_total,
