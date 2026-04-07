@@ -60,10 +60,7 @@ def test_extract_evidence_sanitizes_common_llm_schema_mistakes() -> None:
     )
     assert bundle.qualitative_evidence[0].metadata == {}
     assert diagnostics["qualitative_evidence_count"] == 1
-    assert (
-        scenario.source_pack.documents[0].doc_id
-        == bundle.qualitative_evidence[0].doc_id
-    )
+    assert bundle.qualitative_evidence[0].doc_id == "memo"
 
 
 def test_generate_quiz_bank_falls_back_when_refinement_or_generation_breaks() -> None:
@@ -86,7 +83,7 @@ def test_generate_quiz_bank_falls_back_when_refinement_or_generation_breaks() ->
         source_pack=scenario.source_pack,
     )
 
-    assert len(questions) == 10
+    assert len(questions) == 4
     assert metadata["generation_mode"] == "deterministic_fallback"
-    assert "question_count" in metadata
+    assert metadata["question_count"] == 4
     assert metadata["question_types"] == ["qualitative", "quantitative"]

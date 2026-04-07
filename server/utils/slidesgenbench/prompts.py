@@ -135,8 +135,8 @@ def build_quiz_extraction_prompts(
         "Return JSON with this exact top-level shape:\n"
         '{"quantitative_evidence": [...], "qualitative_evidence": [...], "metadata": {...}}\n\n'
         "Requirements:\n"
-        "- Extract 4 to 6 quantitative evidence items when available.\n"
-        "- Extract 6 to 8 qualitative evidence items when available.\n"
+        "- Extract 1 to 2 quantitative evidence items when available.\n"
+        "- Extract 2 to 3 qualitative evidence items when available.\n"
         "- source_quote must be verbatim from the source text.\n"
         "- source_ref must match the provided source_ref field.\n"
         "- page must be null when unavailable.\n"

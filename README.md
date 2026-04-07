@@ -13,227 +13,189 @@ tags:
 
 # Ppt Agent Environment
 
-A simple test environment that echoes back messages. Perfect for testing the env APIs as well as demonstrating environment usage patterns.
+OpenEnv environment for building and grading PowerPoint presentations. The server hosts the benchmark tasks and graders, and the root `inference.py` connects to the running environment to generate decks with an OpenAI-compatible LLM endpoint.
+
+## Submission Requirements
+
+Set these environment variables before running either the environment or `inference.py`:
+
+- `API_BASE_URL`: OpenAI-compatible API endpoint for model calls
+- `MODEL_NAME`: model identifier for inference and environment-side judge calls
+- `HF_TOKEN`: API token used by the OpenAI client
+
+The repository is structured to match the benchmark contract:
+
+- `inference.py` lives at the repo root
+- `inference.py` uses `openai.OpenAI`
+- the Dockerfile runs the environment server, not the inference script
+- the environment serves `reset`, `step`, `state`, and schema endpoints through OpenEnv
 
 ## Quick Start
 
-The simplest way to use the Ppt Agent environment is through the `PptAgentEnv` class:
+Start the environment locally:
 
-```python
-from ppt_agent import PptAgentAction, PptAgentEnv
-
-try:
-    # Create environment from Docker image
-    ppt_agentenv = PptAgentEnv.from_docker_image("ppt_agent-env:latest")
-
-    # Reset
-    result = ppt_agentenv.reset()
-    print(f"Reset: {result.observation.echoed_message}")
-
-    # Send multiple messages
-    messages = ["Hello, World!", "Testing echo", "Final message"]
-
-    for msg in messages:
-        result = ppt_agentenv.step(PptAgentAction(message=msg))
-        print(f"Sent: '{msg}'")
-        print(f"  → Echoed: '{result.observation.echoed_message}'")
-        print(f"  → Length: {result.observation.message_length}")
-        print(f"  → Reward: {result.reward}")
-
-finally:
-    # Always clean up
-    ppt_agentenv.close()
+```bash
+uv run --env-file .env uvicorn server.app:app --host 0.0.0.0 --port 8000
 ```
 
-That's it! The `PptAgentEnv.from_docker_image()` method handles:
-- Starting the Docker container
-- Waiting for the server to be ready
-- Connecting to the environment
-- Container cleanup when you call `close()`
+Run the baseline inference script against the local environment:
+
+```python
+uv run --env-file .env python inference.py
+```
+
+`inference.py` emits structured logs in this format:
+
+- `[START] task=<task_name> env=<benchmark> model=<model_name>`
+- `[STEP] step=<n> action=<action_str> reward=<0.00> done=<true|false> error=<msg|null>`
+- `[END] success=<true|false> steps=<n> score=<score> rewards=<r1,r2,...,rn>`
 
 ## Building the Docker Image
 
-Before using the environment, you need to build the Docker image:
+Build from the repo root:
 
 ```bash
-# From project root
-docker build -t ppt_agent-env:latest -f server/Dockerfile .
+docker build -t ppt-agent-env:latest .
 ```
 
 ## Deploying to Hugging Face Spaces
 
-You can easily deploy your OpenEnv environment to Hugging Face Spaces using the `openenv push` command:
+This repo is configured as a Docker Space via `openenv.yaml` and the root `Dockerfile`.
+
+Push with OpenEnv:
 
 ```bash
-# From the environment directory (where openenv.yaml is located)
 openenv push
-
-# Or specify options
-openenv push --namespace my-org --private
 ```
 
-The `openenv push` command will:
-1. Validate that the directory is an OpenEnv environment (checks for `openenv.yaml`)
-2. Prepare a custom build for Hugging Face Docker space (enables web interface)
-3. Upload to Hugging Face (ensuring you're logged in)
+In the Hugging Face Space settings, define these secrets or variables:
+
+- `API_BASE_URL`
+- `MODEL_NAME`
+- `HF_TOKEN`
+
+After deployment, the validator should be able to reach:
+
+- `POST /reset`
+- `POST /step`
+- `GET /state`
+- `GET /schema`
+- `GET /health`
 
 ### Prerequisites
 
-- Authenticate with Hugging Face: The command will prompt for login if not already authenticated
+- Authenticate with Hugging Face before pushing
+- Ensure the Space has enough outbound access for model API calls
 
 ### Options
 
-- `--directory`, `-d`: Directory containing the OpenEnv environment (defaults to current directory)
-- `--repo-id`, `-r`: Repository ID in format 'username/repo-name' (defaults to 'username/env-name' from openenv.yaml)
-- `--base-image`, `-b`: Base Docker image to use (overrides Dockerfile FROM)
-- `--private`: Deploy the space as private (default: public)
+- `--repo-id`, `-r`: target Space repository
+- `--private`: create a private Space
+- `--base-image`, `-b`: override the Docker base image if needed
 
 ### Examples
 
 ```bash
-# Push to your personal namespace (defaults to username/env-name from openenv.yaml)
 openenv push
-
-# Push to a specific repository
 openenv push --repo-id my-org/my-env
-
-# Push with a custom base image
-openenv push --base-image ghcr.io/meta-pytorch/openenv-base:latest
-
-# Push as a private space
 openenv push --private
-
-# Combine options
-openenv push --repo-id my-org/my-env --base-image custom-base:latest --private
 ```
 
-After deployment, your space will be available at:
-`https://huggingface.co/spaces/<repo-id>`
-
-The deployed space includes:
-- **Web Interface** at `/web` - Interactive UI for exploring the environment
-- **API Documentation** at `/docs` - Full OpenAPI/Swagger interface
-- **Health Check** at `/health` - Container health monitoring
-- **WebSocket** at `/ws` - Persistent session endpoint for low-latency interactions
+The Space URL will be the ping target for `scripts/validate-submission.sh`.
 
 ## Environment Details
 
 ### Action
-**PptAgentAction**: Contains a single field
-- `message` (str) - The message to echo back
+`PptAgentAction` supports these macro actions:
+
+- `create_slide`
+- `update_slide`
+- `delete_slide`
+- `save_presentation`
 
 ### Observation
-**PptAgentObservation**: Contains the echo response and metadata
-- `echoed_message` (str) - The message echoed back
-- `message_length` (int) - Length of the message
-- `reward` (float) - Reward based on message length (length × 0.1)
-- `done` (bool) - Always False for echo environment
-- `metadata` (dict) - Additional info like step count
+`PptAgentObservation` includes:
+
+- `task_name`
+- `difficulty`
+- `slide_count`
+- `task_prompt`
+- `source_context`
+- `last_action_error`
+- `score`
+- `prompt_summary`
+- `last_action_result`
+- `termination_reason`
+- `reward`
+- `done`
 
 ### Reward
-The reward is calculated as: `message_length × 0.1`
-- "Hi" → reward: 0.2
-- "Hello, World!" → reward: 1.3
-- Empty message → reward: 0.0
+Intermediate steps receive bounded slide-level reward. Finalization evaluates the full presentation and returns a normalized score in `[0.0, 1.0]`.
+
+## Tasks
+
+The environment currently ships with 6 scenarios in `server/data.json`:
+
+- 2 easy
+- 2 medium
+- 2 hard
+
+Each task includes:
+
+- a task prompt
+- source-pack documents
+- task constraints
+- a grader-backed final reward
 
 ## Advanced Usage
 
 ### Connecting to an Existing Server
 
-If you already have a Ppt Agent environment server running, you can connect directly:
+Connect the client directly to a running environment:
 
 ```python
-from ppt_agent import PptAgentEnv
+from client import PptAgentEnv
+from models import PptAgentAction
 
-# Connect to existing server
-ppt_agentenv = PptAgentEnv(base_url="<ENV_HTTP_URL_HERE>")
+env = PptAgentEnv(base_url="http://localhost:8000")
 
-# Use as normal
-result = ppt_agentenv.reset()
-result = ppt_agentenv.step(PptAgentAction(message="Hello!"))
+result = env.reset(difficulty="easy")
+result = env.step(PptAgentAction(action_type="save_presentation", payload={"path": "outputs/demo.pptx"}))
 ```
 
-Note: When connecting to an existing server, `ppt_agentenv.close()` will NOT stop the server.
+Calling `close()` disconnects the client but does not stop the remote server.
 
-### Using the Context Manager
+## Validation
 
-The client supports context manager usage for automatic connection management:
-
-```python
-from ppt_agent import PptAgentAction, PptAgentEnv
-
-# Connect with context manager (auto-connects and closes)
-with PptAgentEnv(base_url="http://localhost:8000") as env:
-    result = env.reset()
-    print(f"Reset: {result.observation.echoed_message}")
-    # Multiple steps with low latency
-    for msg in ["Hello", "World", "!"]:
-        result = env.step(PptAgentAction(message=msg))
-        print(f"Echoed: {result.observation.echoed_message}")
-```
-
-The client uses WebSocket connections for:
-- **Lower latency**: No HTTP connection overhead per request
-- **Persistent session**: Server maintains your environment state
-- **Efficient for episodes**: Better for many sequential steps
-
-### Concurrent WebSocket Sessions
-
-The server supports multiple concurrent WebSocket connections. To enable this,
-modify `server/app.py` to use factory mode:
-
-```python
-# In server/app.py - use factory mode for concurrent sessions
-app = create_app(
-    PptAgentEnvironment,  # Pass class, not instance
-    PptAgentAction,
-    PptAgentObservation,
-    max_concurrent_envs=4,  # Allow 4 concurrent sessions
-)
-```
-
-Then multiple clients can connect simultaneously:
-
-```python
-from ppt_agent import PptAgentAction, PptAgentEnv
-from concurrent.futures import ThreadPoolExecutor
-
-def run_episode(client_id: int):
-    with PptAgentEnv(base_url="http://localhost:8000") as env:
-        result = env.reset()
-        for i in range(10):
-            result = env.step(PptAgentAction(message=f"Client {client_id}, step {i}"))
-        return client_id, result.observation.message_length
-
-# Run 4 episodes concurrently
-with ThreadPoolExecutor(max_workers=4) as executor:
-    results = list(executor.map(run_episode, range(4)))
-```
-
-## Development & Testing
-
-### Direct Environment Testing
-
-Test the environment logic directly without starting the HTTP server:
+Run the built-in checks before submission:
 
 ```bash
-# From the server directory
-python3 server/ppt_agent_environment.py
+openenv validate
+docker build .
+./scripts/validate-submission.sh https://your-space.hf.space .
 ```
 
-This verifies that:
-- Environment resets correctly
-- Step executes actions properly
-- State tracking works
-- Rewards are calculated correctly
+The validator checks:
 
-### Running Locally
+- the HF Space is live and responds to `/reset`
+- the Docker build succeeds
+- `openenv validate` passes
 
-Run the server locally for development:
+## Running Locally
+
+Start the server:
 
 ```bash
-uvicorn server.app:app --reload
+uv run --env-file .env uvicorn server.app:app --host 0.0.0.0 --port 8000
 ```
+
+Run inference against it:
+
+```bash
+uv run --env-file .env python inference.py
+```
+
+You can set `TASK_DIFFICULTY=easy|medium|hard` to control which scenario bucket is sampled.
 
 ## Project Structure
 

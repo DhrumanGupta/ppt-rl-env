@@ -17,7 +17,6 @@ from server.utils.slidesgenbench.prompts import (
     build_quiz_extraction_prompts,
     build_quiz_generation_prompts,
     build_quiz_refinement_prompts,
-    build_quiz_regeneration_prompts,
     build_quiz_source_context,
 )
 
@@ -264,15 +263,11 @@ class SlidesGenQuizBankService:
         self,
         llm_client: LLMClient,
         *,
-        max_attempts: int = 2,
         max_source_section_chars: int = 1200,
     ):
         if llm_client is None:
             raise ValueError("SlidesGenQuizBankService requires an llm_client")
-        if max_attempts < 1:
-            raise ValueError("max_attempts must be at least 1")
         self.llm_client = llm_client
-        self.max_attempts = max_attempts
         self.max_source_section_chars = max_source_section_chars
 
     def generate_quiz_bank(
@@ -301,6 +296,7 @@ class SlidesGenQuizBankService:
             )
             questions, generation_diagnostics = self._generate_questions(
                 task_spec,
+                source_pack,
                 verified_evidence,
                 target_total=target_total,
                 qualitative_target=qualitative_target,
@@ -363,32 +359,18 @@ class SlidesGenQuizBankService:
         user_prompt: str,
         max_tokens: int,
     ) -> tuple[dict[str, Any], dict[str, Any]]:
-        last_error: Exception | None = None
-        for attempt in range(1, self.max_attempts + 1):
-            try:
-                logger.info(
-                    "quizbank stage start stage=%s attempt=%s", stage_name, attempt
-                )
-                payload = self.llm_client.chat_json(
-                    system_prompt, user_prompt, temperature=0.0, max_tokens=max_tokens
-                )
-                if not isinstance(payload, dict):
-                    raise ValueError(f"{stage_name} must return a JSON object")
-                logger.info(
-                    "quizbank stage success stage=%s attempt=%s", stage_name, attempt
-                )
-                return payload, {"attempts": attempt, "max_tokens": max_tokens}
-            except Exception as error:
-                last_error = error
-                logger.warning(
-                    "quizbank stage failed stage=%s attempt=%s error=%s",
-                    stage_name,
-                    attempt,
-                    error,
-                )
-        raise ValueError(
-            f"{stage_name} failed after {self.max_attempts} attempt(s): {last_error}"
-        )
+        logger.info("quizbank stage start stage=%s", stage_name)
+        try:
+            payload = self.llm_client.chat_json(
+                system_prompt, user_prompt, temperature=0.0, max_tokens=max_tokens
+            )
+        except Exception as error:
+            logger.warning("quizbank stage failed stage=%s error=%s", stage_name, error)
+            raise ValueError(f"{stage_name} failed: {error}") from error
+        if not isinstance(payload, dict):
+            raise ValueError(f"{stage_name} must return a JSON object")
+        logger.info("quizbank stage success stage=%s", stage_name)
+        return payload, {"max_tokens": max_tokens}
 
     def _extract_evidence(
         self,
@@ -402,7 +384,7 @@ class SlidesGenQuizBankService:
             stage_name="quiz_extraction",
             system_prompt=system_prompt,
             user_prompt=user_prompt,
-            max_tokens=3000,
+            max_tokens=1800,
         )
         evidence_bundle = _parse_evidence_bundle(
             _sanitize_evidence_bundle_payload(payload)
@@ -471,6 +453,24 @@ class SlidesGenQuizBankService:
         source_context: str,
         evidence_bundle: QuizEvidenceBundle,
     ) -> tuple[QuizEvidenceBundle, dict[str, Any]]:
+        verified_extraction_bundle = self._verify_bundle(
+            evidence_bundle, source_pack=source_pack
+        )
+        if verified_extraction_bundle.qualitative_evidence and (
+            not task_spec.require_quantitative_content
+            or verified_extraction_bundle.quantitative_evidence
+        ):
+            return verified_extraction_bundle, {
+                "max_tokens": 0,
+                "used_verified_extraction": True,
+                "verified_quantitative_evidence_count": len(
+                    verified_extraction_bundle.quantitative_evidence
+                ),
+                "verified_qualitative_evidence_count": len(
+                    verified_extraction_bundle.qualitative_evidence
+                ),
+            }
+
         system_prompt, user_prompt = build_quiz_refinement_prompts(
             task_spec,
             source_context,
@@ -480,7 +480,7 @@ class SlidesGenQuizBankService:
             stage_name="quiz_refinement",
             system_prompt=system_prompt,
             user_prompt=user_prompt,
-            max_tokens=3000,
+            max_tokens=1800,
         )
         candidate_bundle = _parse_evidence_bundle(
             _sanitize_evidence_bundle_payload(payload)
@@ -651,54 +651,61 @@ class SlidesGenQuizBankService:
         by_id = {question.question_id: question for question in questions}
         return [by_id[slot["question_id"]] for slot in expected_slots]
 
-    def _repair_failed_questions(
+    def _build_local_repair_questions(
         self,
         *,
         task_spec: TaskSpec,
-        evidence_bundle: QuizEvidenceBundle,
+        source_pack: SourcePack,
         failed_slots: list[dict[str, Any]],
-        preserved_questions: list[QuizQuestion],
-    ) -> tuple[list[QuizQuestion], dict[str, Any]]:
-        system_prompt, user_prompt = build_quiz_regeneration_prompts(
+    ) -> list[QuizQuestion]:
+        qualitative_target = sum(
+            1 for slot in failed_slots if slot.get("question_type") == "qualitative"
+        )
+        quantitative_target = len(failed_slots) - qualitative_target
+        fallback_questions = self._build_fallback_questions(
             task_spec,
-            evidence_bundle,
-            failed_slots=failed_slots,
-            preserved_questions=to_serializable(preserved_questions),
+            source_pack,
+            target_total=len(failed_slots),
+            qualitative_target=qualitative_target,
+            quantitative_target=quantitative_target,
         )
-        payload, diagnostics = self._call_stage_json(
-            stage_name="quiz_generation_repair",
-            system_prompt=system_prompt,
-            user_prompt=user_prompt,
-            max_tokens=2500,
-        )
-        repaired_questions = self._parse_questions_payload(payload)
-        expected_slots = [
-            _question_slot(slot["question_id"], slot["question_type"])
-            for slot in failed_slots
+
+        qualitative_fallbacks = [
+            question
+            for question in fallback_questions
+            if question.question_type == "qualitative"
         ]
-        valid_repaired, repair_failures, extra_question_ids = (
-            self._validate_question_collection(
-                repaired_questions,
-                evidence_bundle=evidence_bundle,
-                expected_slots=expected_slots,
-            )
-        )
-        if repair_failures:
-            raise ValueError(
-                "quiz_generation_repair returned unresolved invalid questions: "
-                + "; ".join(
-                    f"{failure['question_id']}: {failure['reason']}"
-                    for failure in repair_failures
+        quantitative_fallbacks = [
+            question
+            for question in fallback_questions
+            if question.question_type == "quantitative"
+        ]
+        qualitative_index = 0
+        quantitative_index = 0
+        repaired: list[QuizQuestion] = []
+
+        for slot in failed_slots:
+            question_type = str(slot["question_type"])
+            if question_type == "qualitative":
+                template = qualitative_fallbacks[qualitative_index]
+                qualitative_index += 1
+            else:
+                template = quantitative_fallbacks[quantitative_index]
+                quantitative_index += 1
+            repaired.append(
+                template.model_copy(
+                    update={
+                        "question_id": str(slot["question_id"]),
+                        "question_type": question_type,
+                    }
                 )
             )
-        if extra_question_ids:
-            diagnostics["extra_question_ids"] = sorted(extra_question_ids)
-        diagnostics["repaired_question_count"] = len(valid_repaired)
-        return valid_repaired, diagnostics
+        return repaired
 
     def _generate_questions(
         self,
         task_spec: TaskSpec,
+        source_pack: SourcePack,
         evidence_bundle: QuizEvidenceBundle,
         *,
         target_total: int,
@@ -717,59 +724,43 @@ class SlidesGenQuizBankService:
             quantitative_target=quantitative_target,
             question_slots=question_slots,
         )
-
-        last_error: Exception | None = None
-        for attempt in range(1, self.max_attempts + 1):
-            try:
-                payload = self.llm_client.chat_json(
-                    system_prompt, user_prompt, temperature=0.0, max_tokens=4000
-                )
-                if not isinstance(payload, dict):
-                    raise ValueError("quiz_generation must return a JSON object")
-                generated_questions = self._parse_questions_payload(payload)
-                valid_questions, failures, extra_question_ids = (
-                    self._validate_question_collection(
-                        generated_questions,
-                        evidence_bundle=evidence_bundle,
-                        expected_slots=question_slots,
-                    )
-                )
-
-                repair_diagnostics: dict[str, Any] | None = None
-                if failures:
-                    repaired_questions, repair_diagnostics = (
-                        self._repair_failed_questions(
-                            task_spec=task_spec,
-                            evidence_bundle=evidence_bundle,
-                            failed_slots=failures,
-                            preserved_questions=valid_questions,
-                        )
-                    )
-                    valid_questions.extend(repaired_questions)
-
-                final_questions = self._merge_questions_by_slot(
-                    questions=valid_questions,
-                    expected_slots=question_slots,
-                )
-                diagnostics = {
-                    "attempts": attempt,
-                    "max_tokens": 4000,
-                    "question_count": len(final_questions),
-                    "full_generation_invalid_count": len(failures),
-                }
-                if extra_question_ids:
-                    diagnostics["extra_question_ids"] = sorted(extra_question_ids)
-                if failures:
-                    diagnostics["repaired_slots"] = failures
-                if repair_diagnostics:
-                    diagnostics["repair"] = repair_diagnostics
-                return final_questions, diagnostics
-            except Exception as error:
-                last_error = error
-
-        raise ValueError(
-            f"quiz_generation failed after {self.max_attempts} attempt(s): {last_error}"
+        payload = self.llm_client.chat_json(
+            system_prompt, user_prompt, temperature=0.0, max_tokens=2200
         )
+        if not isinstance(payload, dict):
+            raise ValueError("quiz_generation must return a JSON object")
+        generated_questions = self._parse_questions_payload(payload)
+        valid_questions, failures, extra_question_ids = (
+            self._validate_question_collection(
+                generated_questions,
+                evidence_bundle=evidence_bundle,
+                expected_slots=question_slots,
+            )
+        )
+
+        if failures:
+            repaired_questions = self._build_local_repair_questions(
+                task_spec=task_spec,
+                source_pack=source_pack,
+                failed_slots=failures,
+            )
+            valid_questions.extend(repaired_questions)
+
+        final_questions = self._merge_questions_by_slot(
+            questions=valid_questions,
+            expected_slots=question_slots,
+        )
+        diagnostics = {
+            "max_tokens": 2200,
+            "question_count": len(final_questions),
+            "full_generation_invalid_count": len(failures),
+        }
+        if extra_question_ids:
+            diagnostics["extra_question_ids"] = sorted(extra_question_ids)
+        if failures:
+            diagnostics["repaired_slots"] = failures
+            diagnostics["repair_mode"] = "deterministic_fallback"
+        return final_questions, diagnostics
 
     def _target_question_count(self, source_pack: SourcePack, *, mode: str) -> int:
         text_volume = 0
@@ -777,13 +768,13 @@ class SlidesGenQuizBankService:
             for page_text in document.pages or [document.text or ""]:
                 text_volume += len(page_text)
         if text_volume < 4_000:
-            target = 10
+            target = 4
         elif text_volume < 9_000:
-            target = 14
+            target = 5
         else:
-            target = 18
+            target = 6
         if mode == "train":
-            return min(target, 10)
+            return min(target, 4)
         return target
 
     def _build_fallback_questions(

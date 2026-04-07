@@ -28,15 +28,11 @@ class SlidesGenQuantitativeJudgeService:
         self,
         llm_client: LLMClient,
         *,
-        max_attempts: int = 2,
         max_slide_chars: int = 1200,
     ):
         if llm_client is None:
             raise ValueError("SlidesGenQuantitativeJudgeService requires an llm_client")
-        if max_attempts < 1:
-            raise ValueError("max_attempts must be at least 1")
         self.llm_client = llm_client
-        self.max_attempts = max_attempts
         self.max_slide_chars = max_slide_chars
 
     def judge_quantitative_questions(
@@ -47,7 +43,7 @@ class SlidesGenQuantitativeJudgeService:
         questions: list[QuizQuestion],
     ) -> tuple[dict[str, dict[str, Any]], dict[str, Any]]:
         if not questions:
-            return {}, {"attempts": 0, "question_count": 0}
+            return {}, {"question_count": 0}
 
         system_prompt, user_prompt = build_quantitative_quiz_judging_prompts(
             task_spec,
@@ -56,37 +52,24 @@ class SlidesGenQuantitativeJudgeService:
             max_slide_chars=self.max_slide_chars,
         )
 
-        last_error: Exception | None = None
-        for attempt in range(1, self.max_attempts + 1):
-            try:
-                payload = self.llm_client.chat_json(
-                    system_prompt,
-                    user_prompt,
-                    temperature=0.0,
-                    max_tokens=3000,
-                )
-                answers = self._parse_answers(payload, questions)
-                metadata = (
-                    payload.get("metadata")
-                    if isinstance(payload.get("metadata"), dict)
-                    else {}
-                )
-                diagnostics = {
-                    "attempts": attempt,
-                    "question_count": len(questions),
-                    "llm_client_type": self.llm_client.__class__.__name__,
-                    "slide_count": presentation_extraction.slide_count,
-                }
-                if metadata:
-                    diagnostics["metadata"] = metadata
-                return answers, diagnostics
-            except Exception as error:
-                last_error = error
-
-        raise ValueError(
-            "quantitative_quiz_judging failed after "
-            f"{self.max_attempts} attempt(s): {last_error}"
+        payload = self.llm_client.chat_json(
+            system_prompt,
+            user_prompt,
+            temperature=0.0,
+            max_tokens=3000,
         )
+        answers = self._parse_answers(payload, questions)
+        metadata = (
+            payload.get("metadata") if isinstance(payload.get("metadata"), dict) else {}
+        )
+        diagnostics = {
+            "question_count": len(questions),
+            "llm_client_type": self.llm_client.__class__.__name__,
+            "slide_count": presentation_extraction.slide_count,
+        }
+        if metadata:
+            diagnostics["metadata"] = metadata
+        return answers, diagnostics
 
     @staticmethod
     def _parse_answers(

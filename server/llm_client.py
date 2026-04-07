@@ -1,82 +1,49 @@
-"""
-Unified LLM client for the environment.
-
-Three backends:
-  - OpenAI-compatible (vLLM/local) — for self-hosted models (default)
-  - HF Inference API — free, serverless, no infra needed
-"""
+"""Unified OpenAI-client wrapper for environment-side LLM calls."""
 
 import json
 import logging
 import os
 import re
 
+from openai import OpenAI
+
 logger = logging.getLogger(__name__)
 
 
 class LLMClient:
-    """
-    Thin wrapper that picks the right backend based on env vars.
-
-    Config:
-      LLM_BACKEND=openai     (default) → uses OpenAI-compatible endpoint (vLLM on H100)
-      LLM_BACKEND=hf                   → uses HF Inference API (requires credits)
-
-    OpenAI mode env vars:
-      LLM_BASE_URL  — vLLM endpoint (default: http://localhost:8001/v1)
-      LLM_API_KEY   — API key (default: "local")
-      LLM_MODEL     — model name
-
-    HF mode env vars:
-      HF_TOKEN      — HuggingFace token
-      LLM_MODEL     — model ID (default: Qwen/Qwen3.5-9B)
-
-    """
+    """Thin wrapper around the OpenAI client using submission env vars."""
 
     def __init__(self):
-        self.backend = os.environ.get("LLM_BACKEND", "openai")
-        default_model = "Qwen/Qwen3.5-9B"
-        self.model = os.environ.get("LLM_MODEL", default_model)
+        self.model = os.environ.get("MODEL_NAME", "Qwen/Qwen3.5-9B")
+        self.base_url = os.environ.get(
+            "API_BASE_URL", "https://router.huggingface.co/v1"
+        )
+        api_key = os.environ.get("HF_TOKEN")
+        if not api_key:
+            raise ValueError("HF_TOKEN environment variable is required")
 
-        if self.backend == "hf":
-            from huggingface_hub import InferenceClient
-
-            self.client = InferenceClient(
-                model=self.model,
-                token=os.environ.get("HF_TOKEN"),
-            )
-            logger.info(f"LLM backend: HF Inference API ({self.model})")
-        else:
-            from openai import OpenAI
-
-            self.client = OpenAI(
-                base_url=os.environ.get("LLM_BASE_URL", "http://localhost:8001/v1"),
-                api_key=os.environ.get("LLM_API_KEY", "local"),
-            )
-            logger.info(f"LLM backend: OpenAI-compatible ({self.model})")
+        self.client = OpenAI(base_url=self.base_url, api_key=api_key)
+        logger.info(
+            "LLM client configured model=%s base_url=%s", self.model, self.base_url
+        )
 
     def chat(
         self, system: str, user: str, temperature: float = 0.3, max_tokens: int = 1024
     ) -> str:
         """Send a chat completion request. Returns the raw response text."""
-        if self.backend == "hf":
-            return self._chat_hf(system, user, temperature, max_tokens)
         return self._chat_openai(system, user, temperature, max_tokens)
 
     def chat_json(
         self, system: str, user: str, temperature: float = 0.3, max_tokens: int = 1024
     ) -> dict:
         """Send a chat request and parse the response as JSON."""
-        if self.backend == "hf":
-            raw = self._chat_hf(system, user, temperature, max_tokens)
-        else:
-            raw = self._chat_openai(
-                system,
-                user,
-                temperature,
-                max_tokens,
-                json_mode=True,
-            )
+        raw = self._chat_openai(
+            system,
+            user,
+            temperature,
+            max_tokens,
+            json_mode=True,
+        )
         return self._parse_json(raw)
 
     @staticmethod
@@ -126,19 +93,6 @@ class LLMClient:
                     parts.append(text_attr)
             return "\n".join(part for part in parts if part)
         return str(message_content)
-
-    def _chat_hf(
-        self, system: str, user: str, temperature: float, max_tokens: int
-    ) -> str:
-        response = self.client.chat_completion(
-            messages=[
-                {"role": "system", "content": system},
-                {"role": "user", "content": user},
-            ],
-            temperature=temperature,
-            max_tokens=max_tokens,
-        )
-        return response.choices[0].message.content
 
     def _chat_openai(
         self,

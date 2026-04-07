@@ -143,10 +143,10 @@ def log_step(
     )
 
 
-def log_end(success: bool, steps: int, rewards: list[float]) -> None:
+def log_end(success: bool, steps: int, score: float, rewards: list[float]) -> None:
     rewards_str = ",".join(f"{reward:.2f}" for reward in rewards)
     print(
-        f"[END] success={str(success).lower()} steps={steps} rewards={rewards_str}",
+        f"[END] success={str(success).lower()} steps={steps} score={score:.2f} rewards={rewards_str}",
         flush=True,
     )
 
@@ -264,148 +264,135 @@ def _optional_citation_shape(content: dict[str, Any]) -> list[dict[str, Any]]:
     ]
 
 
-def _build_title_slide_payload(content: dict[str, Any]) -> dict[str, Any]:
-    title = _require_string(content, "title")
-    subtitle = _require_string(content, "subtitle")
-    return {
-        "background_color": "<bg>",
-        "shapes": [
-            {"type": "accent_bar", "name": "accent", "color_hex": "<accent>"},
-            {
-                "type": "text",
-                "name": "title",
-                "text": title,
-                "x": 0.8,
-                "y": 0.9,
-                "w": 8.2,
-                "h": 0.8,
-                "style": {
-                    "font_name": "<font>",
-                    "font_size_pt": "<title_size>",
-                    "color_hex": "<primary>",
-                    "bold": True,
-                },
-            },
-            {
-                "type": "text",
-                "name": "subtitle",
-                "text": subtitle,
-                "x": 0.85,
-                "y": 1.9,
-                "w": 8.4,
-                "h": 0.9,
-                "style": {
-                    "font_name": "<font>",
-                    "font_size_pt": "<body_size>",
-                    "color_hex": "<secondary>",
-                },
-            },
-        ],
-    }
-
-
-def _build_bullets_slide_payload(content: dict[str, Any]) -> dict[str, Any]:
-    title = _require_string(content, "title")
-    body_lines = _require_string_list(content, "body_lines")
-    if len(body_lines) > 4:
-        body_lines = body_lines[:4]
-    body_text = "\n".join(f"- {line}" for line in body_lines)
-    return {
-        "background_color": "<surface>",
-        "shapes": [
-            {"type": "accent_bar", "name": "accent", "color_hex": "<accent>"},
-            {
-                "type": "text",
-                "name": "title",
-                "text": title,
-                "x": 0.8,
-                "y": 0.8,
-                "w": 3.8,
-                "h": 0.6,
-                "style": {
-                    "font_name": "<font>",
-                    "font_size_pt": 24,
-                    "color_hex": "<primary>",
-                    "bold": True,
-                },
-            },
-            {
-                "type": "text",
-                "name": "body",
-                "text": body_text,
-                "x": 0.9,
-                "y": 1.7,
-                "w": 7.2,
-                "h": 2.3,
-                "style": {
-                    "font_name": "<font>",
-                    "font_size_pt": "<body_size>",
-                    "color_hex": "<secondary>",
-                },
-            },
-            *_optional_citation_shape(content),
-        ],
-    }
-
-
-def _build_chart_slide_payload(content: dict[str, Any]) -> dict[str, Any]:
-    title = _require_string(content, "title")
-    chart_title = _require_string(content, "chart_title")
-    categories = _require_string_list(content, "categories")
-    values = _require_number_list(content, "values")
-    series_name = _require_string(content, "series_name")
-    if len(categories) != len(values):
-        raise ValueError("categories and values must have the same length")
-    return {
-        "background_color": "<surface>",
-        "shapes": [
-            {"type": "accent_bar", "name": "accent", "color_hex": "<accent>"},
-            {
-                "type": "text",
-                "name": "title",
-                "text": title,
-                "x": 0.8,
-                "y": 0.8,
-                "w": 4.8,
-                "h": 0.6,
-                "style": {
-                    "font_name": "<font>",
-                    "font_size_pt": 24,
-                    "color_hex": "<primary>",
-                    "bold": True,
-                },
-            },
-            {
-                "type": "chart",
-                "name": "chart",
-                "chart_type": "column_clustered",
-                "chart_data": {
-                    "categories": categories,
-                    "series": [{"name": series_name, "values": values}],
-                },
-                "x": 0.9,
-                "y": 1.6,
-                "w": 7.0,
-                "h": 3.9,
-                "style": {
-                    "title": chart_title,
-                    "series_colors": ["<accent>"],
-                },
-            },
-            *_optional_citation_shape(content),
-        ],
-    }
-
-
-def _build_create_slide_payload(
+def _normalize_create_slide_payload(
     slide_kind: str, content: dict[str, Any]
 ) -> dict[str, Any]:
     if slide_kind == "title":
-        return _build_title_slide_payload(content)
+        return {
+            "background_color": "<bg>",
+            "shapes": [
+                {"type": "accent_bar", "name": "accent", "color_hex": "<accent>"},
+                {
+                    "type": "text",
+                    "name": "title",
+                    "text": _require_string(content, "title"),
+                    "x": 0.8,
+                    "y": 0.9,
+                    "w": 8.2,
+                    "h": 0.8,
+                    "style": {
+                        "font_name": "<font>",
+                        "font_size_pt": "<title_size>",
+                        "color_hex": "<primary>",
+                        "bold": True,
+                    },
+                },
+                {
+                    "type": "text",
+                    "name": "subtitle",
+                    "text": _require_string(content, "subtitle"),
+                    "x": 0.85,
+                    "y": 1.9,
+                    "w": 8.4,
+                    "h": 0.9,
+                    "style": {
+                        "font_name": "<font>",
+                        "font_size_pt": "<body_size>",
+                        "color_hex": "<secondary>",
+                    },
+                },
+            ],
+        }
+
     if slide_kind == "bullets":
-        return _build_bullets_slide_payload(content)
+        body_lines = _require_string_list(content, "body_lines")[:4]
+        return {
+            "background_color": "<surface>",
+            "shapes": [
+                {"type": "accent_bar", "name": "accent", "color_hex": "<accent>"},
+                {
+                    "type": "text",
+                    "name": "title",
+                    "text": _require_string(content, "title"),
+                    "x": 0.8,
+                    "y": 0.8,
+                    "w": 3.8,
+                    "h": 0.6,
+                    "style": {
+                        "font_name": "<font>",
+                        "font_size_pt": 24,
+                        "color_hex": "<primary>",
+                        "bold": True,
+                    },
+                },
+                {
+                    "type": "text",
+                    "name": "body",
+                    "text": "\n".join(f"- {line}" for line in body_lines),
+                    "x": 0.9,
+                    "y": 1.7,
+                    "w": 7.2,
+                    "h": 2.3,
+                    "style": {
+                        "font_name": "<font>",
+                        "font_size_pt": "<body_size>",
+                        "color_hex": "<secondary>",
+                    },
+                },
+                *_optional_citation_shape(content),
+            ],
+        }
+
     if slide_kind == "chart":
-        return _build_chart_slide_payload(content)
+        categories = _require_string_list(content, "categories")
+        values = _require_number_list(content, "values")
+        if len(categories) != len(values):
+            raise ValueError("categories and values must have the same length")
+        return {
+            "background_color": "<surface>",
+            "shapes": [
+                {"type": "accent_bar", "name": "accent", "color_hex": "<accent>"},
+                {
+                    "type": "text",
+                    "name": "title",
+                    "text": _require_string(content, "title"),
+                    "x": 0.8,
+                    "y": 0.8,
+                    "w": 4.8,
+                    "h": 0.6,
+                    "style": {
+                        "font_name": "<font>",
+                        "font_size_pt": 24,
+                        "color_hex": "<primary>",
+                        "bold": True,
+                    },
+                },
+                {
+                    "type": "chart",
+                    "name": "chart",
+                    "chart_type": "column_clustered",
+                    "chart_data": {
+                        "categories": categories,
+                        "series": [
+                            {
+                                "name": _require_string(content, "series_name"),
+                                "values": values,
+                            }
+                        ],
+                    },
+                    "x": 0.9,
+                    "y": 1.6,
+                    "w": 7.0,
+                    "h": 3.9,
+                    "style": {
+                        "title": _require_string(content, "chart_title"),
+                        "series_colors": ["<accent>"],
+                    },
+                },
+                *_optional_citation_shape(content),
+            ],
+        }
+
     raise ValueError(f"Unsupported slide_kind '{slide_kind}'")
 
 
@@ -450,7 +437,7 @@ def _build_action(payload: dict[str, Any], observation: Any) -> PptAgentAction:
             raise ValueError("content must be an object for create_slide")
         return PptAgentAction(
             action_type="create_slide",
-            payload=_build_create_slide_payload(slide_kind, content),
+            payload=_normalize_create_slide_payload(slide_kind, content),
         )
     if action_type == "save_presentation":
         return PptAgentAction(
@@ -533,66 +520,60 @@ def choose_action(
     raise RuntimeError(f"LLM failed to produce valid stage content: {last_error}")
 
 
-async def _make_env() -> PptAgentEnv:
-    env = PptAgentEnv(base_url=ENV_BASE_URL, message_timeout_s=180.0)
-    await env.connect()
-    return env
-
-
 async def main() -> None:
     client = OpenAI(base_url=API_BASE_URL, api_key=HF_TOKEN)
-    env: PptAgentEnv | None = None
     rewards: list[float] = []
     history: list[dict[str, Any]] = []
     steps_taken = 0
+    score = 0.0
     success = False
     started = False
 
     try:
-        env = await _make_env()
-        result = await env.reset(difficulty=TASK_DIFFICULTY)
-        observation = result.observation
-        log_start(
-            task=observation.task_name or "unknown", env=BENCHMARK, model=MODEL_NAME
-        )
-        started = True
-
-        for step in range(1, MAX_STEPS + 1):
-            if result.done:
-                break
-            action, action_str, history_entry = choose_action(
-                client, observation, history
-            )
-            result = await env.step(action)
+        async with PptAgentEnv(base_url=ENV_BASE_URL, message_timeout_s=180.0) as env:
+            result = await env.reset(difficulty=TASK_DIFFICULTY)
             observation = result.observation
-            reward = float(result.reward or 0.0)
-            rewards.append(reward)
-            history.append(history_entry)
-            steps_taken = step
-            log_step(
-                step=step,
-                action=action_str,
-                reward=reward,
-                done=result.done,
-                error=observation.last_action_error,
+            log_start(
+                task=observation.task_name or "unknown",
+                env=BENCHMARK,
+                model=MODEL_NAME,
             )
-            if result.done:
-                break
+            started = True
 
-        success = bool(
-            started
-            and result.done
-            and not observation.last_action_error
-            and observation.score > 0.0
-        )
-    except Exception:
+            for step in range(1, MAX_STEPS + 1):
+                if result.done:
+                    break
+                action, action_str, history_entry = choose_action(
+                    client, observation, history
+                )
+                result = await env.step(action)
+                observation = result.observation
+                reward = float(result.reward or 0.0)
+                rewards.append(reward)
+                history.append(history_entry)
+                steps_taken = step
+                log_step(
+                    step=step,
+                    action=action_str,
+                    reward=reward,
+                    done=result.done,
+                    error=observation.last_action_error,
+                )
+                if result.done:
+                    break
+
+            success = bool(
+                started
+                and result.done
+                and not observation.last_action_error
+                and observation.score > 0.0
+            )
+            score = float(observation.score or 0.0)
+    except Exception as error:
+        print(f"[DEBUG] inference failed: {error}", flush=True)
         success = False
     finally:
-        try:
-            if env is not None:
-                await env.close()
-        finally:
-            log_end(success=success, steps=steps_taken, rewards=rewards)
+        log_end(success=success, steps=steps_taken, score=score, rewards=rewards)
 
 
 if __name__ == "__main__":
