@@ -175,6 +175,16 @@ def test_create_slide_step_uses_intermediate_reward() -> None:
     assert observation.score == 0.0
 
 
+def test_reset_exposes_source_pack_brief_and_page_labeled_context() -> None:
+    env = _make_env(max_steps=3)
+
+    observation = env.reset(seed=7)
+
+    assert "[Source Pack Brief]" in observation.source_context
+    assert "Page 1:" in observation.source_context
+    assert "| retail_memo]" in observation.source_context
+
+
 def test_update_slide_returns_tool_metadata_for_agent_followup() -> None:
     env = _make_env(max_steps=5)
     env.reset(seed=7)

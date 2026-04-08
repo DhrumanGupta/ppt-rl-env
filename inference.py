@@ -9,6 +9,13 @@ from typing import Any
 
 from openai import OpenAI
 
+from agent_action_tools import (
+    AgentToolInvocation,
+    build_openai_tools,
+    parse_tool_invocation,
+    tool_invocation_to_action,
+)
+
 try:
     from ppt_agent import PptAgentAction, PptAgentEnv
 except ImportError:  # pragma: no cover
@@ -17,8 +24,6 @@ except ImportError:  # pragma: no cover
 
 
 HF_TOKEN = os.getenv("HF_TOKEN")
-if HF_TOKEN is None:
-    raise ValueError("HF_TOKEN environment variable is required")
 
 API_BASE_URL = os.getenv("API_BASE_URL", "https://router.huggingface.co/v1")
 MODEL_NAME = os.getenv("MODEL_NAME", "Qwen/Qwen3.5-27B")
@@ -29,6 +34,20 @@ TEMPERATURE = float(os.getenv("TEMPERATURE", "0.1"))
 MAX_TOKENS = int(os.getenv("MAX_TOKENS", "700"))
 
 BENCHMARK = "ppt_agent"
+
+OPENAI_TOOLS = build_openai_tools()
+
+_THEME_TOKENS = {
+    "bg": "primary page background",
+    "surface": "content surface background",
+    "accent": "accent color",
+    "primary": "primary text color",
+    "secondary": "secondary text color",
+    "font": "default font family",
+    "title_size": "title font size",
+    "body_size": "body font size",
+    "caption_size": "caption font size",
+}
 
 _NUMBER_WORDS = {
     "one": 1,
@@ -41,87 +60,28 @@ _NUMBER_WORDS = {
 
 SYSTEM_PROMPT = textwrap.dedent(
     """
-    You are an expert PowerPoint author operating a prompt-to-PPT benchmark.
+    You are an expert PowerPoint author making a presentation to address the given task.
 
     Your input always includes:
     - the full task prompt from the environment
     - the source-pack context from the environment
     - the current slide count
     - the current max step budget
+    - recent action history, including prior tool results and named shape ids when available
 
-    Your job is to decide the next deck-building action and provide only the content needed
-    for that action. The number of slides is not fixed here: infer it from the task prompt.
-    Use only information grounded in the provided source context.
-    Keep the writing concise, professional, and presentation-ready.
+    Your job is to choose exactly one next environment tool call. Use the provided tools directly:
+    - create_slide
+    - update_slide
+    - delete_slide
+    - save_presentation
 
-    Presentation quality expectations:
-    - Build a deck that reads like a polished consulting or executive review, not raw notes.
-    - Give each slide a clear purpose and avoid repeating the same message across slides.
-    - Prefer strong, informative slide titles over generic titles like "Overview" unless the prompt clearly calls for them.
-    - Use short, high-signal bullets that highlight decisions, outcomes, comparisons, or implications.
-    - Make the slide sequence feel intentional: opening context first, evidence and analysis in the middle, quantitative visuals where appropriate, then save.
-    - When a metric or claim comes from the source pack, preserve the factual wording and numbers accurately.
-    - Keep density reasonable. It is better to make an additional focused slide than to overload one slide.
+    Theme tokens available inside payloads:
+    - <bg>, <surface>, <accent>, <primary>, <secondary>
+    - <font>, <title_size>, <body_size>, <caption_size>
 
-    Examples of good presentation judgment:
-    - Good: one clear headline, two or three supporting bullets, and enough whitespace for the slide to breathe.
-    - Good: a chart slide with a specific takeaway title and only the data needed to support that takeaway.
-    - Good: splitting two different ideas into separate slides when the prompt gives enough slide budget.
-    - Bad: many bullet points packed tightly at the top while large empty areas remain below or to the side.
-    - Bad: repeating the same title slide style and message multiple times instead of advancing the story.
-    - Bad: turning every fact from the source pack into a bullet when a smaller number of sharper points would communicate better.
-    - Bad: using a chart when there is no meaningful quantitative series to show.
+    Make the slides visually appealing and well-structured, and ensure the content addresses the task prompt effectively. This should include a good color scheme, readable fonts, and an appropriate amount of content per slide, with sufficient spacing.
 
-    The environment also supports update_slide for targeted refinements to an existing slide.
-    In this client, prefer create_slide for forward progress and save_presentation when complete.
-    Avoid many update-style revisions; only make a refinement if there is a clear omission or correction that materially improves the deck.
-
-    Return exactly one JSON object with this shape:
-    {
-      "action_type": "create_slide" | "save_presentation",
-      "slide_kind": "title" | "bullets" | "chart" | null,
-      "content": {...},
-      "reason": "short explanation"
-    }
-
-    If action_type is create_slide, slide_kind must be one of:
-
-    1. title
-       content = {
-         "title": "short title",
-         "subtitle": "one concise subtitle"
-       }
-
-    2. bullets
-       content = {
-         "title": "slide title",
-         "body_lines": ["fact line 1", "fact line 2"]
-       }
-
-    3. chart
-       content = {
-         "title": "chart slide title",
-         "chart_title": "chart title",
-         "categories": ["Q1", "Q2", "Q3", "Q4"],
-         "series_name": "series label",
-         "values": [1, 2, 3, 4]
-        }
-
-    If action_type is save_presentation:
-    - set slide_kind to null
-    - set content to {}
-
-    Rules:
-    - Return exactly one JSON object.
-    - Do not wrap the JSON in markdown.
-    - Do not invent facts that are not in the source context.
-    - Keep slide titles short.
-    - Make each new slide meaningfully different from prior slides.
-    - For bullets, use 2 to 4 body_lines.
-    - For chart, categories and values must have equal length.
-    - Save only when the prompt requirements appear fully covered.
-    - Prefer a small number of high-quality steps over many small revisions.
-    - Use plain ASCII text.
+    Return no prose. Produce exactly one tool call.
     """
 ).strip()
 
@@ -165,31 +125,26 @@ def _infer_target_slide_count(task_prompt: str) -> int | None:
     return None
 
 
-def _planning_prompt(observation: Any, history: list[dict[str, Any]]) -> str:
-    return json.dumps(
-        {
-            "task_name": observation.task_name,
-            "difficulty": observation.difficulty,
-            "task_prompt": observation.task_prompt,
-            "source_context": observation.source_context,
-            "prompt_summary": observation.prompt_summary,
-            "slide_count": observation.slide_count,
-            "last_action_error": observation.last_action_error,
-            "max_steps": MAX_STEPS,
-            "target_slide_count_hint": _infer_target_slide_count(
-                observation.task_prompt
-            ),
-            "recent_slides": history[-5:],
-            "requirements": {
-                "save_path": _default_output_path(
-                    observation.task_name, observation.difficulty
-                ),
-                "supported_slide_kinds": ["title", "bullets", "chart"],
-                "allowed_action_types": ["create_slide", "save_presentation"],
-            },
-        },
-        separators=(",", ":"),
-    )
+def _extract_message_text(content: Any) -> str:
+    if isinstance(content, str):
+        return content
+    if content is None:
+        return ""
+    if isinstance(content, list):
+        parts: list[str] = []
+        for item in content:
+            if isinstance(item, str):
+                parts.append(item)
+                continue
+            if isinstance(item, dict):
+                text_value = item.get("text")
+                if isinstance(text_value, str):
+                    parts.append(text_value)
+                    continue
+                if item.get("type") == "text" and isinstance(item.get("content"), str):
+                    parts.append(item["content"])
+        return "\n".join(part for part in parts if part)
+    return str(content)
 
 
 def _extract_json_object(raw: str) -> dict[str, Any]:
@@ -210,174 +165,100 @@ def _extract_json_object(raw: str) -> dict[str, Any]:
     return parsed
 
 
-def _require_string(payload: dict[str, Any], key: str) -> str:
-    value = payload.get(key)
-    if not isinstance(value, str) or not value.strip():
-        raise ValueError(f"{key} must be a non-empty string")
-    return value.strip()
+def _known_named_shapes_by_slide(
+    history: list[dict[str, Any]],
+) -> dict[int, dict[str, int]]:
+    slide_shapes: dict[int, dict[str, int]] = {}
 
+    for entry in history:
+        if not isinstance(entry, dict):
+            continue
 
-def _require_string_list(payload: dict[str, Any], key: str) -> list[str]:
-    value = payload.get(key)
-    if not isinstance(value, list) or not value:
-        raise ValueError(f"{key} must be a non-empty list")
-    normalized: list[str] = []
-    for item in value:
-        if not isinstance(item, str) or not item.strip():
-            raise ValueError(f"{key} must contain non-empty strings")
-        normalized.append(item.strip())
-    return normalized
+        tool_name = entry.get("tool_name")
+        slide_index = entry.get("slide_index")
+        tool_result = entry.get("tool_result")
+        if not isinstance(tool_result, dict):
+            tool_result = {}
 
-
-def _require_number_list(payload: dict[str, Any], key: str) -> list[float]:
-    value = payload.get(key)
-    if not isinstance(value, list) or not value:
-        raise ValueError(f"{key} must be a non-empty list")
-    normalized: list[float] = []
-    for item in value:
-        if isinstance(item, bool) or not isinstance(item, (int, float)):
-            raise ValueError(f"{key} must contain numbers")
-        normalized.append(float(item))
-    return normalized
-
-
-def _normalize_create_slide_payload(
-    slide_kind: str, content: dict[str, Any]
-) -> dict[str, Any]:
-    if slide_kind == "title":
-        return {
-            "background_color": "<bg>",
-            "shapes": [
-                {"type": "accent_bar", "name": "accent", "color_hex": "<accent>"},
-                {
-                    "type": "text",
-                    "name": "title",
-                    "text": _require_string(content, "title"),
-                    "x": 0.8,
-                    "y": 0.9,
-                    "w": 8.2,
-                    "h": 0.8,
-                    "style": {
-                        "font_name": "<font>",
-                        "font_size_pt": "<title_size>",
-                        "color_hex": "<primary>",
-                        "bold": True,
-                    },
-                },
-                {
-                    "type": "text",
-                    "name": "subtitle",
-                    "text": _require_string(content, "subtitle"),
-                    "x": 0.85,
-                    "y": 1.9,
-                    "w": 8.4,
-                    "h": 0.9,
-                    "style": {
-                        "font_name": "<font>",
-                        "font_size_pt": "<body_size>",
-                        "color_hex": "<secondary>",
-                    },
-                },
-            ],
+        named_shapes = tool_result.get("named_shapes")
+        if not isinstance(named_shapes, dict):
+            named_shapes = {}
+        normalized_named_shapes = {
+            name: shape_id
+            for name, shape_id in named_shapes.items()
+            if isinstance(name, str) and isinstance(shape_id, int)
         }
 
-    if slide_kind == "bullets":
-        body_lines = _require_string_list(content, "body_lines")[:4]
-        return {
-            "background_color": "<surface>",
-            "shapes": [
-                {"type": "accent_bar", "name": "accent", "color_hex": "<accent>"},
-                {
-                    "type": "text",
-                    "name": "title",
-                    "text": _require_string(content, "title"),
-                    "x": 0.8,
-                    "y": 0.8,
-                    "w": 3.8,
-                    "h": 0.6,
-                    "style": {
-                        "font_name": "<font>",
-                        "font_size_pt": 24,
-                        "color_hex": "<primary>",
-                        "bold": True,
-                    },
-                },
-                {
-                    "type": "text",
-                    "name": "body",
-                    "text": "\n".join(f"- {line}" for line in body_lines),
-                    "x": 0.9,
-                    "y": 1.7,
-                    "w": 7.2,
-                    "h": 2.3,
-                    "style": {
-                        "font_name": "<font>",
-                        "font_size_pt": "<body_size>",
-                        "color_hex": "<secondary>",
-                    },
-                },
-            ],
-        }
+        if tool_name == "create_slide" and isinstance(slide_index, int):
+            slide_shapes[slide_index] = dict(normalized_named_shapes)
+            continue
 
-    if slide_kind == "chart":
-        categories = _require_string_list(content, "categories")
-        values = _require_number_list(content, "values")
-        if len(categories) != len(values):
-            raise ValueError("categories and values must have the same length")
-        return {
-            "background_color": "<surface>",
-            "shapes": [
-                {"type": "accent_bar", "name": "accent", "color_hex": "<accent>"},
-                {
-                    "type": "text",
-                    "name": "title",
-                    "text": _require_string(content, "title"),
-                    "x": 0.8,
-                    "y": 0.8,
-                    "w": 4.8,
-                    "h": 0.6,
-                    "style": {
-                        "font_name": "<font>",
-                        "font_size_pt": 24,
-                        "color_hex": "<primary>",
-                        "bold": True,
-                    },
-                },
-                {
-                    "type": "chart",
-                    "name": "chart",
-                    "chart_type": "column_clustered",
-                    "chart_data": {
-                        "categories": categories,
-                        "series": [
-                            {
-                                "name": _require_string(content, "series_name"),
-                                "values": values,
-                            }
-                        ],
-                    },
-                    "x": 0.9,
-                    "y": 1.6,
-                    "w": 7.0,
-                    "h": 3.9,
-                    "style": {
-                        "title": _require_string(content, "chart_title"),
-                        "series_colors": ["<accent>"],
-                    },
-                },
-            ],
-        }
+        if tool_name == "update_slide" and isinstance(slide_index, int):
+            current = slide_shapes.setdefault(slide_index, {})
+            deleted_shape_ids = {
+                shape_id
+                for shape_id in tool_result.get("deleted_shape_ids") or []
+                if isinstance(shape_id, int)
+            }
+            if deleted_shape_ids:
+                current = {
+                    name: shape_id
+                    for name, shape_id in current.items()
+                    if shape_id not in deleted_shape_ids
+                }
+            current.update(normalized_named_shapes)
+            slide_shapes[slide_index] = current
+            continue
 
-    raise ValueError(f"Unsupported slide_kind '{slide_kind}'")
+        if tool_name == "delete_slide" and isinstance(slide_index, int):
+            reindexed: dict[int, dict[str, int]] = {}
+            for existing_index, existing_shapes in slide_shapes.items():
+                if existing_index < slide_index:
+                    reindexed[existing_index] = existing_shapes
+                elif existing_index > slide_index:
+                    reindexed[existing_index - 1] = existing_shapes
+            slide_shapes = reindexed
+
+    return slide_shapes
 
 
-def _validate_payload_choice(
-    payload: dict[str, Any], observation: Any, history: list[dict[str, Any]]
-) -> None:
-    action_type = payload.get("action_type")
-    target_slide_count = _infer_target_slide_count(observation.task_prompt)
+def _planning_prompt(observation: Any, history: list[dict[str, Any]]) -> str:
+    return json.dumps(
+        {
+            "task_name": observation.task_name,
+            "difficulty": observation.difficulty,
+            "task_prompt": observation.task_prompt,
+            "source_context": observation.source_context,
+            "prompt_summary": observation.prompt_summary,
+            "slide_count": observation.slide_count,
+            "last_action_error": observation.last_action_error,
+            "last_action_result": observation.last_action_result,
+            "max_steps": MAX_STEPS,
+            "target_slide_count_hint": _infer_target_slide_count(
+                observation.task_prompt
+            ),
+            "recent_actions": history[-5:],
+            "known_named_shapes_by_slide": _known_named_shapes_by_slide(history),
+            "requirements": {
+                "save_path": _default_output_path(
+                    observation.task_name, observation.difficulty
+                ),
+                "supported_tools": [
+                    "create_slide",
+                    "update_slide",
+                    "delete_slide",
+                    "save_presentation",
+                ],
+                "theme_tokens": _THEME_TOKENS,
+            },
+        },
+        separators=(",", ":"),
+    )
 
-    if action_type == "save_presentation":
+
+def _validate_tool_choice(invocation: AgentToolInvocation, observation: Any) -> None:
+    if invocation.tool_name == "save_presentation":
+        target_slide_count = _infer_target_slide_count(observation.task_prompt)
         if (
             target_slide_count is not None
             and observation.slide_count < target_slide_count
@@ -385,46 +266,44 @@ def _validate_payload_choice(
             raise ValueError("cannot save before reaching the requested slide count")
         return
 
-    if action_type != "create_slide":
-        raise ValueError("action_type must be create_slide or save_presentation")
-
-    slide_kind = payload.get("slide_kind")
-    if slide_kind == "title" and observation.slide_count > 0:
-        raise ValueError("title slide should only be created first")
-
-    used_slide_kinds = {
-        entry.get("slide_kind")
-        for entry in history
-        if isinstance(entry, dict) and entry.get("action_type") == "create_slide"
-    }
-    if slide_kind == "chart" and "chart" in used_slide_kinds:
-        raise ValueError("chart slide already created")
+    if invocation.tool_name in {"update_slide", "delete_slide"}:
+        slide_index = invocation.arguments.get("slide_index")
+        if not isinstance(slide_index, int):
+            raise ValueError(f"{invocation.tool_name} requires slide_index")
+        if slide_index > observation.slide_count:
+            raise ValueError(
+                f"slide_index {slide_index} is out of range for {observation.slide_count} slides"
+            )
 
 
-def _build_action(payload: dict[str, Any], observation: Any) -> PptAgentAction:
-    action_type = payload.get("action_type")
-    if action_type == "create_slide":
-        slide_kind = payload.get("slide_kind")
-        if not isinstance(slide_kind, str):
-            raise ValueError("slide_kind must be a string for create_slide")
-        content = payload.get("content")
-        if not isinstance(content, dict):
-            raise ValueError("content must be an object for create_slide")
-        return PptAgentAction(
-            action_type="create_slide",
-            payload=_normalize_create_slide_payload(slide_kind, content),
+def _extract_tool_invocation(
+    message: Any,
+) -> tuple[AgentToolInvocation, dict[str, Any]]:
+    tool_calls = getattr(message, "tool_calls", None) or []
+    if tool_calls:
+        if len(tool_calls) != 1:
+            raise ValueError("LLM must emit exactly one tool call")
+        tool_call = tool_calls[0]
+        function = getattr(tool_call, "function", None)
+        tool_name = getattr(function, "name", None)
+        arguments = getattr(function, "arguments", None) or "{}"
+        if not isinstance(tool_name, str) or not tool_name:
+            raise ValueError("Tool call missing function name")
+        return (
+            parse_tool_invocation(tool_name, arguments),
+            {"tool_name": tool_name, "arguments": arguments},
         )
-    if action_type == "save_presentation":
-        return PptAgentAction(
-            action_type="save_presentation",
-            payload={
-                "path": _default_output_path(
-                    observation.task_name,
-                    observation.difficulty,
-                )
-            },
-        )
-    raise ValueError(f"Unsupported action_type '{action_type}'")
+
+    raw = _extract_message_text(getattr(message, "content", None))
+    payload = _extract_json_object(raw)
+    tool_name = payload.get("tool_name")
+    arguments = payload.get("arguments")
+    if not isinstance(tool_name, str) or not isinstance(arguments, dict):
+        raise ValueError("LLM must emit exactly one tool call")
+    return (
+        parse_tool_invocation(tool_name, arguments),
+        {"tool_name": tool_name, "arguments": arguments},
+    )
 
 
 def _action_log_payload(action: PptAgentAction) -> str:
@@ -438,64 +317,77 @@ def _action_log_payload(action: PptAgentAction) -> str:
     )
 
 
-def _history_entry_from_payload(payload: dict[str, Any]) -> dict[str, Any]:
-    content = payload.get("content")
-    if not isinstance(content, dict):
-        content = {}
+def _history_entry_from_tool_call(
+    invocation: AgentToolInvocation, observation: Any
+) -> dict[str, Any]:
+    slide_index: int | None = None
+    if (
+        invocation.tool_name == "create_slide"
+        and observation.last_action_result is not None
+    ):
+        slide_index = observation.slide_count
+    elif invocation.tool_name in {"update_slide", "delete_slide"}:
+        slide_index = invocation.arguments.get("slide_index")
+
+    tool_result: dict[str, Any] | None = None
+    if isinstance(observation.last_action_result, dict):
+        raw_tool_result = observation.last_action_result.get("tool_result")
+        if isinstance(raw_tool_result, dict):
+            tool_result = raw_tool_result
+
     return {
-        "action_type": payload.get("action_type"),
-        "slide_kind": payload.get("slide_kind"),
-        "title": content.get("title"),
-        "reason": payload.get("reason"),
+        "tool_name": invocation.tool_name,
+        "arguments": invocation.arguments,
+        "slide_index": slide_index,
+        "tool_result": tool_result,
+        "error": observation.last_action_error,
     }
 
 
 def choose_action(
     client: OpenAI, observation: Any, history: list[dict[str, Any]]
-) -> tuple[PptAgentAction, str, dict[str, Any]]:
+) -> tuple[PptAgentAction, str, AgentToolInvocation]:
     messages = [
         {"role": "system", "content": SYSTEM_PROMPT},
         {"role": "user", "content": _planning_prompt(observation, history)},
     ]
-    last_error: Exception | None = None
+    raw_response: dict[str, Any] | None = None
 
-    for _ in range(3):
-        try:
-            completion = client.chat.completions.create(
-                model=MODEL_NAME,
-                messages=messages,
-                temperature=TEMPERATURE,
-                max_tokens=MAX_TOKENS,
-                response_format={"type": "json_object"},
+    try:
+        completion = client.chat.completions.create(
+            model=MODEL_NAME,
+            messages=messages,
+            temperature=TEMPERATURE,
+            max_tokens=MAX_TOKENS,
+            tools=OPENAI_TOOLS,
+            tool_choice="required",
+        )
+        message = completion.choices[0].message
+        invocation, raw_response = _extract_tool_invocation(message)
+        _validate_tool_choice(invocation, observation)
+        action = tool_invocation_to_action(
+            invocation,
+            default_save_path=_default_output_path(
+                observation.task_name,
+                observation.difficulty,
+            ),
+        )
+        return action, _action_log_payload(action), invocation
+    except Exception as error:
+        print(f"[DEBUG] choose_action failed: {error}", flush=True)
+        if raw_response is not None:
+            print(
+                "[DEBUG] choose_action response="
+                + json.dumps(raw_response, separators=(",", ":")),
+                flush=True,
             )
-            raw = completion.choices[0].message.content or "{}"
-            payload = _extract_json_object(raw)
-            _validate_payload_choice(payload, observation, history)
-            action = _build_action(payload, observation)
-            return (
-                action,
-                _action_log_payload(action),
-                _history_entry_from_payload(payload),
-            )
-        except Exception as error:
-            last_error = error
-            messages.append(
-                {"role": "assistant", "content": raw if "raw" in locals() else "{}"}
-            )
-            messages.append(
-                {
-                    "role": "user",
-                    "content": (
-                        "Your previous JSON was invalid for the requested stage. "
-                        f"Error: {error}. Return one corrected JSON object only."
-                    ),
-                }
-            )
-
-    raise RuntimeError(f"LLM failed to produce valid stage content: {last_error}")
+        raise
 
 
 async def main() -> None:
+    if HF_TOKEN is None:
+        raise ValueError("HF_TOKEN environment variable is required")
+
     client = OpenAI(base_url=API_BASE_URL, api_key=HF_TOKEN)
     rewards: list[float] = []
     history: list[dict[str, Any]] = []
@@ -518,14 +410,19 @@ async def main() -> None:
             for step in range(1, MAX_STEPS + 1):
                 if result.done:
                     break
-                action, action_str, history_entry = choose_action(
-                    client, observation, history
+                # choose_action performs a synchronous model request. Keep it off
+                # the event loop so websocket heartbeat traffic can still flow.
+                action, action_str, invocation = await asyncio.to_thread(
+                    choose_action,
+                    client,
+                    observation,
+                    history,
                 )
                 result = await env.step(action)
                 observation = result.observation
                 reward = float(result.reward or 0.0)
                 rewards.append(reward)
-                history.append(history_entry)
+                history.append(_history_entry_from_tool_call(invocation, observation))
                 steps_taken = step
                 log_step(
                     step=step,

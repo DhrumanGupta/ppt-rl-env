@@ -377,6 +377,7 @@ class PptxEditor:
     ) -> int:
         slide = self._get_slide_by_id(slide_id)
         textbox = slide.shapes.add_textbox(Inches(x), Inches(y), Inches(cx), Inches(cy))
+        textbox.line.fill.background()
         return textbox.shape_id
 
     def insert_text_by_id(self, slide_id: int, shape_id: int, text: str):

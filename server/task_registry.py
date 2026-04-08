@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 import random
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Iterable
 
@@ -27,15 +27,11 @@ _DATA_PATH = Path(__file__).with_name("data.json")
 @dataclass(frozen=True, slots=True)
 class TaskScenario:
     task_id: str
+    difficulty: str
     prompt_text: str
     source_pack: SourcePack
     task_constraints: TaskConstraints
     theme: dict[str, Any]
-    metadata: dict[str, Any] = field(default_factory=dict)
-
-    @property
-    def difficulty(self) -> str:
-        return str(self.metadata.get("difficulty", ""))
 
 
 class TaskRegistry:
@@ -97,13 +93,20 @@ def _load_raw_scenarios() -> list[dict[str, Any]]:
 
 
 def _build_source_document(payload: dict[str, Any]) -> SourceDocument:
+    pages_payload = payload.get("pages")
+    pages = None
+    if isinstance(pages_payload, list):
+        pages = [str(item).strip() for item in pages_payload if str(item).strip()]
+        if not pages:
+            pages = None
+
     return SourceDocument(
         doc_id=str(payload["doc_id"]),
         title=str(payload["title"]),
         path=payload.get("path"),
         mime_type=str(payload.get("mime_type", "text/plain")),
-        text=payload.get("text"),
-        pages=payload.get("pages"),
+        text=str(payload["text"]).strip() if payload.get("text") is not None else None,
+        pages=pages,
         images=payload.get("images"),
         metadata=payload.get("metadata")
         if isinstance(payload.get("metadata"), dict)
@@ -126,13 +129,26 @@ def _build_task_constraints(payload: dict[str, Any]) -> TaskConstraints:
 def _build_scenario(payload: dict[str, Any]) -> TaskScenario:
     task_id = str(payload["task_id"])
     difficulty = str(payload["difficulty"]).lower()
-    source_documents = payload.get("source_documents")
+    source_pack_payload = payload.get("source_pack")
+    source_documents = None
+    source_pack_brief = None
+    if isinstance(source_pack_payload, dict):
+        source_documents = source_pack_payload.get("documents")
+        brief = source_pack_payload.get("brief")
+        if isinstance(brief, str) and brief.strip():
+            source_pack_brief = brief.strip()
+    else:
+        source_documents = payload.get("source_documents")
+
     if not isinstance(source_documents, list) or not source_documents:
-        raise ValueError(f"Scenario '{task_id}' must define source_documents")
+        raise ValueError(
+            f"Scenario '{task_id}' must define source_pack.documents or source_documents"
+        )
 
     source_pack = SourcePack(
         task_id=task_id,
         documents=[_build_source_document(item) for item in source_documents],
+        brief=source_pack_brief,
         metadata={
             **(
                 payload.get("metadata")
@@ -145,18 +161,11 @@ def _build_scenario(payload: dict[str, Any]) -> TaskScenario:
 
     return TaskScenario(
         task_id=task_id,
+        difficulty=difficulty,
         prompt_text=str(payload["prompt_text"]),
         source_pack=source_pack,
         task_constraints=_build_task_constraints(payload.get("task_constraints") or {}),
         theme={**DEFAULT_THEME, **dict(payload.get("theme") or {})},
-        metadata={
-            **(
-                payload.get("metadata")
-                if isinstance(payload.get("metadata"), dict)
-                else {}
-            ),
-            "difficulty": difficulty,
-        },
     )
 
 

@@ -439,20 +439,30 @@ class PptAgentEnvironment(Environment):
             return ""
 
         sections: list[str] = []
+        if self._scenario.source_pack.brief:
+            sections.append(f"[Source Pack Brief]\n{self._scenario.source_pack.brief}")
+
         for document in self._scenario.source_pack.documents:
             title = document.title.strip() if document.title else document.doc_id
-            body_parts = document.pages or ([document.text] if document.text else [])
-            body = "\n".join(
-                part.strip() for part in body_parts if part and part.strip()
-            )
+            if document.pages:
+                body = "\n\n".join(
+                    f"Page {page_index}:\n{page_text.strip()}"
+                    for page_index, page_text in enumerate(document.pages, start=1)
+                    if page_text and page_text.strip()
+                )
+            else:
+                body_parts = [document.text] if document.text else []
+                body = "\n".join(
+                    part.strip() for part in body_parts if part and part.strip()
+                )
             if body:
-                sections.append(f"[{title}]\n{body}")
+                sections.append(f"[{title} | {document.doc_id}]\n{body}")
         return "\n\n".join(sections)
 
     def _difficulty(self) -> str:
         if self._scenario is None:
             return ""
-        return str(self._scenario.metadata.get("difficulty", ""))
+        return self._scenario.difficulty
 
     def _execute_action(self, action: PptAgentAction) -> _ActionExecutionResult:
         handler = getattr(self, f"_handle_{action.action_type.lower()}", None)
