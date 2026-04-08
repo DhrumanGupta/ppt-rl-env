@@ -17,81 +17,69 @@ class _StrictModel(BaseModel):
 
 
 class TextStyleArgs(_StrictModel):
-    font_name: str | None = None
-    font_size_pt: float | str | None = None
+    font_name: str = ""
+    font_size_pt: str = ""
     bold: bool | None = None
     italic: bool | None = None
-    color_hex: str | None = None
+    color_hex: str = ""
     word_wrap: bool | None = None
-    space_before_pt: float | str | None = None
-    space_after_pt: float | str | None = None
+    space_before_pt: float | None = None
+    space_after_pt: float | None = None
     line_spacing: float | None = None
 
 
 class ChartStyleArgs(_StrictModel):
-    title: str | None = None
-    title_font_name: str | None = None
-    title_font_size_pt: float | str | None = None
+    title: str = ""
+    title_font_name: str = ""
+    title_font_size_pt: str = ""
     title_bold: bool | None = None
     title_italic: bool | None = None
-    title_color_hex: str | None = None
-    legend_font_name: str | None = None
-    legend_font_size_pt: float | str | None = None
+    title_color_hex: str = ""
+    legend_font_name: str = ""
+    legend_font_size_pt: str = ""
     legend_bold: bool | None = None
     legend_italic: bool | None = None
-    legend_color_hex: str | None = None
-    axis_font_name: str | None = None
-    axis_font_size_pt: float | str | None = None
+    legend_color_hex: str = ""
+    axis_font_name: str = ""
+    axis_font_size_pt: str = ""
     axis_bold: bool | None = None
     axis_italic: bool | None = None
-    axis_color_hex: str | None = None
-    series_colors: list[str] | None = None
+    axis_color_hex: str = ""
+    series_colors: list[str] = Field(default_factory=list)
 
 
 class TableStyleArgs(_StrictModel):
-    header_fill_hex: str | None = None
-    body_fill_hex: str | None = None
-    header_font_name: str | None = None
-    body_font_name: str | None = None
-    header_font_size_pt: float | str | None = None
-    body_font_size_pt: float | str | None = None
+    header_fill_hex: str = ""
+    body_fill_hex: str = ""
+    header_font_name: str = ""
+    body_font_name: str = ""
+    header_font_size_pt: str = ""
+    body_font_size_pt: str = ""
     header_bold: bool | None = None
     body_bold: bool | None = None
     header_italic: bool | None = None
     body_italic: bool | None = None
-    header_font_color_hex: str | None = None
-    body_font_color_hex: str | None = None
+    header_font_color_hex: str = ""
+    body_font_color_hex: str = ""
 
 
 class ThemeArgs(_StrictModel):
-    bg: str | None = None
-    surface: str | None = None
-    accent: str | None = None
-    primary: str | None = None
-    secondary: str | None = None
-    font: str | None = None
+    bg: str = ""
+    surface: str = ""
+    accent: str = ""
+    primary: str = ""
+    secondary: str = ""
+    font: str = ""
     title_size: float | None = None
     body_size: float | None = None
     caption_size: float | None = None
 
 
-class _NamedShapeArgs(_StrictModel):
-    name: str | None = None
-
-
-class _UpdateShapeArgs(_NamedShapeArgs):
-    shape_id: int = Field(ge=1)
-
-
-class CreateAccentBarArgs(_NamedShapeArgs):
+class AccentBarShapeArgs(_StrictModel):
     type: Literal["accent_bar"]
-    color_hex: str
-    height: float | None = None
-
-
-class UpdateAccentBarArgs(_UpdateShapeArgs):
-    type: Literal["accent_bar"]
-    color_hex: str | None = None
+    shape_id: int | None = None
+    name: str = ""
+    color_hex: str = ""
     height: float | None = None
     x: float | None = None
     y: float | None = None
@@ -99,113 +87,75 @@ class UpdateAccentBarArgs(_UpdateShapeArgs):
     h: float | None = None
 
 
-class CreateTextArgs(_NamedShapeArgs):
+class TextShapeArgs(_StrictModel):
     type: Literal["text"]
-    text: str
-    x: float
-    y: float
-    w: float
-    h: float
-    style: TextStyleArgs | None = None
-
-
-class UpdateTextArgs(_UpdateShapeArgs):
-    type: Literal["text"]
-    text: str | None = None
+    shape_id: int | None = None
+    name: str = ""
+    text: str = ""
     x: float | None = None
     y: float | None = None
     w: float | None = None
     h: float | None = None
-    style: TextStyleArgs | None = None
+    style: TextStyleArgs = Field(default_factory=TextStyleArgs)
 
 
-class CreateChartArgs(_NamedShapeArgs):
+class ChartShapeArgs(_StrictModel):
     type: Literal["chart"]
-    chart_type: str
-    chart_data: dict[str, Any]
-    x: float
-    y: float
-    w: float
-    h: float
-    style: ChartStyleArgs | None = None
-
-
-class UpdateChartArgs(_UpdateShapeArgs):
-    type: Literal["chart"]
+    shape_id: int | None = None
+    name: str = ""
+    chart_type: str = ""
+    chart_data: dict[str, Any] = Field(default_factory=dict)
     x: float | None = None
     y: float | None = None
     w: float | None = None
     h: float | None = None
-    style: ChartStyleArgs | None = None
+    style: ChartStyleArgs = Field(default_factory=ChartStyleArgs)
 
 
-class CreateTableArgs(_NamedShapeArgs):
+class TableShapeArgs(_StrictModel):
     type: Literal["table"]
-    table_data: list[list[str]]
-    x: float
-    y: float
-    w: float
-    h: float
-    style: TableStyleArgs | None = None
-
-
-class UpdateTableArgs(_UpdateShapeArgs):
-    type: Literal["table"]
+    shape_id: int | None = None
+    name: str = ""
+    table_data: list[list[str]] = Field(default_factory=list)
     x: float | None = None
     y: float | None = None
     w: float | None = None
     h: float | None = None
-    style: TableStyleArgs | None = None
+    style: TableStyleArgs = Field(default_factory=TableStyleArgs)
 
 
-class CreateImageArgs(_NamedShapeArgs):
+class ImageShapeArgs(_StrictModel):
     type: Literal["image"]
-    image_path: str
-    x: float
-    y: float
-    w: float | None = None
-    h: float | None = None
-
-
-class UpdateImageArgs(_UpdateShapeArgs):
-    type: Literal["image"]
-    image_path: str | None = None
+    shape_id: int | None = None
+    name: str = ""
+    image_path: str = ""
     x: float | None = None
     y: float | None = None
     w: float | None = None
     h: float | None = None
 
 
-CreateShapeArgs = Annotated[
-    CreateAccentBarArgs
-    | CreateTextArgs
-    | CreateChartArgs
-    | CreateTableArgs
-    | CreateImageArgs,
-    Field(discriminator="type"),
-]
-
-UpdateShapeArgs = Annotated[
-    UpdateAccentBarArgs
-    | UpdateTextArgs
-    | UpdateChartArgs
-    | UpdateTableArgs
-    | UpdateImageArgs,
+ShapeArgs = Annotated[
+    AccentBarShapeArgs
+    | TextShapeArgs
+    | ChartShapeArgs
+    | TableShapeArgs
+    | ImageShapeArgs,
     Field(discriminator="type"),
 ]
 
 
 class CreateSlideArgs(_StrictModel):
-    background_color: str | None = None
-    shapes: list[CreateShapeArgs] = Field(default_factory=list)
+    background_color: str = ""
+    shapes: list[ShapeArgs] = Field(default_factory=list)
 
 
 class UpdateSlideArgs(_StrictModel):
     slide_index: int = Field(ge=1)
-    background_color: str | None = None
+    background_color: str = ""
     delete_shape_ids: list[int] = Field(default_factory=list)
-    add_shapes: list[CreateShapeArgs] = Field(default_factory=list)
-    update_shapes: list[UpdateShapeArgs] = Field(default_factory=list)
+    add_shapes: list[ShapeArgs] = Field(default_factory=list)
+    update_shapes: list[ShapeArgs] = Field(default_factory=list)
 
 
 class DeleteSlideArgs(_StrictModel):
@@ -213,7 +163,7 @@ class DeleteSlideArgs(_StrictModel):
 
 
 class SavePresentationArgs(_StrictModel):
-    path: str | None = None
+    path: str = ""
 
 
 class SetThemeArgs(ThemeArgs):
@@ -229,11 +179,11 @@ _TOOL_MODELS = {
 }
 
 _TOOL_DESCRIPTIONS = {
-    "create_slide": "Create a new slide with optional background and shapes.",
-    "update_slide": "Refine one existing slide by updating, adding, or deleting shapes.",
-    "delete_slide": "Delete one existing slide by its 1-based slide index.",
-    "save_presentation": "Write the current presentation to disk when the deck is complete.",
-    "set_theme": "Set default theme tokens by overwriting provided keys on the default theme.",
+    "create_slide": "Create slide with shapes.",
+    "update_slide": "Update one slide.",
+    "delete_slide": "Delete one slide by index.",
+    "save_presentation": "Save the presentation.",
+    "set_theme": "Set default theme tokens.",
 }
 
 
@@ -250,7 +200,58 @@ class AgentToolInvocation:
 
     @property
     def arguments(self) -> dict[str, Any]:
-        return self.arguments_model.model_dump(exclude_none=True, exclude_unset=True)
+        return self.arguments_model.model_dump(
+            exclude_none=True,
+            exclude_unset=True,
+            exclude_defaults=True,
+        )
+
+
+def _require_keys(payload: dict[str, Any], keys: tuple[str, ...], label: str) -> None:
+    missing = [key for key in keys if key not in payload]
+    if missing:
+        raise ValueError(f"{label} missing required fields: {', '.join(missing)}")
+
+
+def _validate_create_shape(shape: dict[str, Any]) -> None:
+    shape_type = shape["type"]
+    if shape_type == "accent_bar":
+        _require_keys(shape, ("color_hex",), "accent_bar shape")
+        return
+    if shape_type == "text":
+        _require_keys(shape, ("text", "x", "y", "w", "h"), "text shape")
+        return
+    if shape_type == "chart":
+        _require_keys(
+            shape,
+            ("chart_type", "chart_data", "x", "y", "w", "h"),
+            "chart shape",
+        )
+        return
+    if shape_type == "table":
+        _require_keys(shape, ("table_data", "x", "y", "w", "h"), "table shape")
+        return
+    if shape_type == "image":
+        _require_keys(shape, ("image_path", "x", "y"), "image shape")
+        return
+
+
+def _validate_update_shape(shape: dict[str, Any]) -> None:
+    _require_keys(shape, ("shape_id",), f"{shape['type']} update")
+
+
+def _validate_tool_arguments(tool_name: str, arguments: dict[str, Any]) -> None:
+    if tool_name == "create_slide":
+        for shape in arguments.get("shapes", []):
+            _validate_create_shape(shape)
+        return
+
+    if tool_name == "update_slide":
+        for shape in arguments.get("add_shapes", []):
+            _validate_create_shape(shape)
+        for shape in arguments.get("update_shapes", []):
+            _validate_update_shape(shape)
+        return
 
 
 def build_openai_tools() -> list[dict[str, Any]]:
@@ -284,9 +285,17 @@ def parse_tool_invocation(
     if not isinstance(raw_arguments, dict):
         raise ValueError("Tool arguments must decode to a JSON object")
 
+    arguments_model = model.model_validate(raw_arguments)
+    compact_arguments = arguments_model.model_dump(
+        exclude_none=True,
+        exclude_unset=True,
+        exclude_defaults=True,
+    )
+    _validate_tool_arguments(tool_name, compact_arguments)
+
     return AgentToolInvocation(
         tool_name=tool_name,
-        arguments_model=model.model_validate(raw_arguments),
+        arguments_model=arguments_model,
     )
 
 

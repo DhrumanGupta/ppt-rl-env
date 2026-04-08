@@ -3,7 +3,6 @@ from __future__ import annotations
 import asyncio
 import json
 import os
-import re
 import textwrap
 from typing import Any
 
@@ -36,29 +35,8 @@ MAX_TOKENS = int(os.getenv("MAX_TOKENS", "700"))
 BENCHMARK = "ppt_agent"
 
 OPENAI_TOOLS = build_openai_tools()
-print(len(str(OPENAI_TOOLS)))
-quit()
 
-_THEME_TOKENS = {
-    "bg": "primary page background",
-    "surface": "content surface background",
-    "accent": "accent color",
-    "primary": "primary text color",
-    "secondary": "secondary text color",
-    "font": "default font family",
-    "title_size": "title font size",
-    "body_size": "body font size",
-    "caption_size": "caption font size",
-}
-
-_NUMBER_WORDS = {
-    "one": 1,
-    "two": 2,
-    "three": 3,
-    "four": 4,
-    "five": 5,
-    "six": 6,
-}
+_FALLBACK_SAVE_PATH = "outputs/presentation.pptx"
 
 SYSTEM_PROMPT = textwrap.dedent(
     """
@@ -134,8 +112,6 @@ SYSTEM_PROMPT = textwrap.dedent(
 
     Make the slides visually appealing and well-structured, and ensure the content addresses the task prompt effectively. This should include a good color scheme, readable fonts, and an appropriate amount of content per slide, with sufficient spacing.
 
-    Always make discord theme dark presentations.
-
     Return no prose. Produce exactly one tool call.
     """
 ).strip()
@@ -163,164 +139,57 @@ def log_end(success: bool, steps: int, score: float, rewards: list[float]) -> No
     )
 
 
-def _default_output_path(task_name: str, difficulty: str) -> str:
-    safe_task = task_name or "presentation"
-    safe_difficulty = difficulty or "unknown"
-    return os.path.join("outputs", f"{safe_task}_{safe_difficulty}_inference.pptx")
+def _observation_metadata(observation: Any) -> dict[str, Any]:
+    metadata = getattr(observation, "metadata", None)
+    return metadata if isinstance(metadata, dict) else {}
 
 
-def _infer_target_slide_count(task_prompt: str) -> int | None:
-    lowered = task_prompt.lower()
-    match = re.search(r"(\d+)\s*-?slide", lowered)
-    if match:
-        return int(match.group(1))
-    for word, value in _NUMBER_WORDS.items():
-        if f"{word}-slide" in lowered or f"{word} slide" in lowered:
-            return value
-    return None
+def _planning_payload(
+    observation: Any, history: list[dict[str, Any]]
+) -> dict[str, Any]:
+    metadata = _observation_metadata(observation)
+    current_theme = metadata.get("current_theme")
+    known_named_shapes = metadata.get("known_named_shapes_by_slide")
+    slide_constraints = metadata.get("slide_constraints")
+    default_save_path = metadata.get("default_save_path")
 
-
-def _extract_message_text(content: Any) -> str:
-    if isinstance(content, str):
-        return content
-    if content is None:
-        return ""
-    if isinstance(content, list):
-        parts: list[str] = []
-        for item in content:
-            if isinstance(item, str):
-                parts.append(item)
-                continue
-            if isinstance(item, dict):
-                text_value = item.get("text")
-                if isinstance(text_value, str):
-                    parts.append(text_value)
-                    continue
-                if item.get("type") == "text" and isinstance(item.get("content"), str):
-                    parts.append(item["content"])
-        return "\n".join(part for part in parts if part)
-    return str(content)
-
-
-def _extract_json_object(raw: str) -> dict[str, Any]:
-    raw = raw.strip()
-    if raw.startswith("```"):
-        raw = raw.strip("`")
-        raw = raw.replace("json", "", 1).strip()
-    try:
-        parsed = json.loads(raw)
-    except json.JSONDecodeError:
-        start = raw.find("{")
-        end = raw.rfind("}")
-        if start == -1 or end == -1 or end <= start:
-            raise
-        parsed = json.loads(raw[start : end + 1])
-    if not isinstance(parsed, dict):
-        raise ValueError("LLM response must be a JSON object")
-    return parsed
-
-
-def _known_named_shapes_by_slide(
-    history: list[dict[str, Any]],
-) -> dict[int, dict[str, int]]:
-    slide_shapes: dict[int, dict[str, int]] = {}
-
-    for entry in history:
-        if not isinstance(entry, dict):
-            continue
-
-        tool_name = entry.get("tool_name")
-        slide_index = entry.get("slide_index")
-        tool_result = entry.get("tool_result")
-        if not isinstance(tool_result, dict):
-            tool_result = {}
-
-        named_shapes = tool_result.get("named_shapes")
-        if not isinstance(named_shapes, dict):
-            named_shapes = {}
-        normalized_named_shapes = {
-            name: shape_id
-            for name, shape_id in named_shapes.items()
-            if isinstance(name, str) and isinstance(shape_id, int)
-        }
-
-        if tool_name == "create_slide" and isinstance(slide_index, int):
-            slide_shapes[slide_index] = dict(normalized_named_shapes)
-            continue
-
-        if tool_name == "update_slide" and isinstance(slide_index, int):
-            current = slide_shapes.setdefault(slide_index, {})
-            deleted_shape_ids = {
-                shape_id
-                for shape_id in tool_result.get("deleted_shape_ids") or []
-                if isinstance(shape_id, int)
-            }
-            if deleted_shape_ids:
-                current = {
-                    name: shape_id
-                    for name, shape_id in current.items()
-                    if shape_id not in deleted_shape_ids
-                }
-            current.update(normalized_named_shapes)
-            slide_shapes[slide_index] = current
-            continue
-
-        if tool_name == "delete_slide" and isinstance(slide_index, int):
-            reindexed: dict[int, dict[str, int]] = {}
-            for existing_index, existing_shapes in slide_shapes.items():
-                if existing_index < slide_index:
-                    reindexed[existing_index] = existing_shapes
-                elif existing_index > slide_index:
-                    reindexed[existing_index - 1] = existing_shapes
-            slide_shapes = reindexed
-
-    return slide_shapes
-
-
-def _planning_prompt(observation: Any, history: list[dict[str, Any]]) -> str:
-    return json.dumps(
-        {
-            "task_name": observation.task_name,
-            "difficulty": observation.difficulty,
-            "task_prompt": observation.task_prompt,
-            "source_context": observation.source_context,
-            "prompt_summary": observation.prompt_summary,
-            "slide_count": observation.slide_count,
-            "last_action_error": observation.last_action_error,
-            "last_action_result": observation.last_action_result,
-            "max_steps": MAX_STEPS,
-            "target_slide_count_hint": _infer_target_slide_count(
-                observation.task_prompt
-            ),
-            "recent_actions": history[-5:],
-            "known_named_shapes_by_slide": _known_named_shapes_by_slide(history),
-            "requirements": {
-                "save_path": _default_output_path(
-                    observation.task_name, observation.difficulty
-                ),
-                "supported_tools": [
-                    "create_slide",
-                    "update_slide",
-                    "delete_slide",
-                    "set_theme",
-                    "save_presentation",
-                ],
-                "theme_tokens": _THEME_TOKENS,
-                "current_theme": observation.metadata.get("current_theme", {}),
-            },
-        },
-        separators=(",", ":"),
-    )
+    return {
+        "task_prompt": observation.task_prompt,
+        "source_context": observation.source_context,
+        "slide_count": observation.slide_count,
+        "remaining_steps": max(
+            0,
+            int(metadata.get("max_steps", MAX_STEPS))
+            - int(metadata.get("step_count", 0)),
+        ),
+        "last_action_error": observation.last_action_error,
+        "last_action_result": observation.last_action_result,
+        "recent_actions": history[-5:],
+        "known_named_shapes_by_slide": (
+            known_named_shapes if isinstance(known_named_shapes, dict) else {}
+        ),
+        "current_theme": current_theme if isinstance(current_theme, dict) else {},
+        "slide_constraints": (
+            slide_constraints if isinstance(slide_constraints, dict) else {}
+        ),
+        "default_save_path": (
+            default_save_path
+            if isinstance(default_save_path, str) and default_save_path
+            else _FALLBACK_SAVE_PATH
+        ),
+    }
 
 
 def _validate_tool_choice(invocation: AgentToolInvocation, observation: Any) -> None:
     if invocation.tool_name == "save_presentation":
-        target_slide_count = _infer_target_slide_count(observation.task_prompt)
-        if (
-            target_slide_count is not None
-            and observation.slide_count < target_slide_count
-        ):
-            raise ValueError("cannot save before reaching the requested slide count")
+        constraints = _observation_metadata(observation).get("slide_constraints")
+        min_slides = (
+            constraints.get("min_slides") if isinstance(constraints, dict) else None
+        )
+        if isinstance(min_slides, int) and observation.slide_count < min_slides:
+            raise ValueError(
+                "cannot save before reaching the required minimum slide count"
+            )
         return
 
     if invocation.tool_name in {"update_slide", "delete_slide"}:
@@ -337,65 +206,36 @@ def _extract_tool_invocation(
     message: Any,
 ) -> tuple[AgentToolInvocation, dict[str, Any]]:
     tool_calls = getattr(message, "tool_calls", None) or []
-    if tool_calls:
-        if len(tool_calls) != 1:
-            raise ValueError("LLM must emit exactly one tool call")
-        tool_call = tool_calls[0]
-        function = getattr(tool_call, "function", None)
-        tool_name = getattr(function, "name", None)
-        arguments = getattr(function, "arguments", None) or "{}"
-        if not isinstance(tool_name, str) or not tool_name:
-            raise ValueError("Tool call missing function name")
-        return (
-            parse_tool_invocation(tool_name, arguments),
-            {"tool_name": tool_name, "arguments": arguments},
-        )
-
-    raw = _extract_message_text(getattr(message, "content", None))
-    payload = _extract_json_object(raw)
-    tool_name = payload.get("tool_name")
-    arguments = payload.get("arguments")
-    if not isinstance(tool_name, str) or not isinstance(arguments, dict):
+    if len(tool_calls) != 1:
         raise ValueError("LLM must emit exactly one tool call")
+    tool_call = tool_calls[0]
+    function = getattr(tool_call, "function", None)
+    tool_name = getattr(function, "name", None)
+    arguments = getattr(function, "arguments", None) or "{}"
+    if not isinstance(tool_name, str) or not tool_name:
+        raise ValueError("Tool call missing function name")
     return (
         parse_tool_invocation(tool_name, arguments),
         {"tool_name": tool_name, "arguments": arguments},
     )
 
 
-def _action_log_payload(action: PptAgentAction) -> str:
-    return json.dumps(
-        {
-            "action_type": action.action_type,
-            "slide_index": action.slide_index,
-            "payload": action.payload,
-        },
-        separators=(",", ":"),
-    )
-
-
 def _history_entry_from_tool_call(
     invocation: AgentToolInvocation, observation: Any
 ) -> dict[str, Any]:
-    slide_index: int | None = None
-    if (
-        invocation.tool_name == "create_slide"
-        and observation.last_action_result is not None
-    ):
-        slide_index = observation.slide_count
-    elif invocation.tool_name in {"update_slide", "delete_slide"}:
-        slide_index = invocation.arguments.get("slide_index")
-
-    tool_result: dict[str, Any] | None = None
-    if isinstance(observation.last_action_result, dict):
-        raw_tool_result = observation.last_action_result.get("tool_result")
-        if isinstance(raw_tool_result, dict):
-            tool_result = raw_tool_result
+    last_action_result = (
+        observation.last_action_result
+        if isinstance(observation.last_action_result, dict)
+        else {}
+    )
+    slide_index = last_action_result.get("slide_index")
+    raw_tool_result = last_action_result.get("tool_result")
+    tool_result = raw_tool_result if isinstance(raw_tool_result, dict) else None
 
     return {
         "tool_name": invocation.tool_name,
         "arguments": invocation.arguments,
-        "slide_index": slide_index,
+        "slide_index": slide_index if isinstance(slide_index, int) else None,
         "tool_result": tool_result,
         "error": observation.last_action_error,
     }
@@ -404,9 +244,16 @@ def _history_entry_from_tool_call(
 def choose_action(
     client: OpenAI, observation: Any, history: list[dict[str, Any]]
 ) -> tuple[PptAgentAction, str, AgentToolInvocation]:
+    metadata = _observation_metadata(observation)
     messages = [
         {"role": "system", "content": SYSTEM_PROMPT},
-        {"role": "user", "content": _planning_prompt(observation, history)},
+        {
+            "role": "user",
+            "content": json.dumps(
+                _planning_payload(observation, history),
+                separators=(",", ":"),
+            ),
+        },
     ]
     raw_response: dict[str, Any] | None = None
 
@@ -424,12 +271,24 @@ def choose_action(
         _validate_tool_choice(invocation, observation)
         action = tool_invocation_to_action(
             invocation,
-            default_save_path=_default_output_path(
-                observation.task_name,
-                observation.difficulty,
+            default_save_path=(
+                metadata.get("default_save_path")
+                if isinstance(metadata.get("default_save_path"), str)
+                else _FALLBACK_SAVE_PATH
             ),
         )
-        return action, _action_log_payload(action), invocation
+        return (
+            action,
+            json.dumps(
+                {
+                    "action_type": action.action_type,
+                    "slide_index": action.slide_index,
+                    "payload": action.payload,
+                },
+                separators=(",", ":"),
+            ),
+            invocation,
+        )
     except Exception as error:
         print(f"[DEBUG] choose_action failed: {error}", flush=True)
         if raw_response is not None:
