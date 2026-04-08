@@ -40,8 +40,8 @@ HF_TOKEN = os.getenv("HF_TOKEN")
 API_BASE_URL = os.getenv("API_BASE_URL", "https://router.huggingface.co/v1")
 MODEL_NAME = os.getenv("MODEL_NAME", "Qwen/Qwen3.5-27B")
 ENV_BASE_URL = os.getenv("ENV_BASE_URL", "http://localhost:8000")
-TASK_DIFFICULTY = os.getenv("TASK_DIFFICULTY", "easy")
-MAX_STEPS = int(os.getenv("MAX_STEPS", "15"))
+TASK_DIFFICULTY = os.getenv("TASK_DIFFICULTY", "hard")
+MAX_STEPS = int(os.getenv("MAX_STEPS", "20"))
 TEMPERATURE = float(os.getenv("TEMPERATURE", "0.1"))
 MAX_TOKENS = int(os.getenv("MAX_TOKENS", "8192"))
 
@@ -133,6 +133,7 @@ SYSTEM_PROMPT = textwrap.dedent(
     - If needed, set or refine the theme first.
     - Think about the slide structure and then create it in one go.
     - Call update_slide only if you think it is needed
+    - You have a finite max step budget. Do not let remaining_steps reach 0 before calling save_presentation.
     - Save only when the deck is coherent, complete, and professionally presented.
 
     Example create_slide payload:
@@ -502,6 +503,18 @@ async def main() -> None:
                 )
                 if result.done:
                     break
+            else:
+                print(
+                    f"[DEBUG] reached max steps {MAX_STEPS} without completion",
+                    flush=True,
+                )
+                # Save the presentation in case it is partially complete and we can get a score for it
+                await env.step(
+                    PptAgentAction(
+                        action_type="save_presentation",
+                        payload={"path": _FALLBACK_SAVE_PATH},
+                    )
+                )
 
             success = bool(
                 started

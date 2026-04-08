@@ -1,7 +1,7 @@
 {
   "scenarios": [
     {
-      "task_id": "northstar_growth_easy",
+      "task_id": "harbor_retail_easy",
       "difficulty": "easy",
       "prompt_text": "Create a factual two-slide presentation for a professional audience about Harbor Retail Expansion 2026. Slide 1 should introduce the initiative, the operating focus, and why management launched it. Slide 2 should summarize the measurable business results, including same-store sales growth from 4.2% to 6.1% and delivery complaints reduced by 22%.",
       "task_constraints": {
@@ -91,16 +91,19 @@
     {
       "task_id": "northstar_growth_medium",
       "difficulty": "medium",
-      "prompt_text": "Create a factual four-slide presentation for a professional audience about Northstar Growth Plan 2026. Slide 1 should introduce the plan and its business objective. Slide 2 should explain the retention improvement from 88% to 93% and why it matters commercially. Slide 3 should explain how guided automation reduced onboarding time by 35%. Slide 4 should show a revenue chart with quarterly target values 18, 24, 28, and 32.",
+      "prompt_text": "Create a presentation for a non-technical executive audience about Northstar Growth Plan 2026, covering the strategic rationale, the key retention and onboarding improvements, and the quarterly revenue targets. The presentation should include a chart showing the revenue trajectory and a table comparing before-and-after metrics. Aim for four to five slides.",
       "task_constraints": {
         "min_slides": 4,
-        "max_slides": 4,
-        "target_audience": "professional",
+        "max_slides": 5,
+        "target_audience": "non-technical executive",
         "tone": "professional",
-        "extra_constraints": {}
+        "extra_constraints": {
+          "require_chart": true,
+          "require_table": true
+        }
       },
       "source_pack": {
-        "brief": "Use the source pack to separate strategy, commercial impact, and quantified operating outcomes. The final slide should visualize the quarterly targets rather than repeat them as bullets.",
+        "brief": "This pack contains strategy memos, commercial analysis, finance targets, and supplementary material. Not all documents are equally relevant. Some context must be synthesized across multiple documents to form a complete picture.",
         "documents": [
           {
             "doc_id": "plan_memo",
@@ -128,6 +131,25 @@
               "Quarterly revenue targets are 18, 24, 28, and 32 million dollars.",
               "Leadership expects the step-up to come from stronger renewals and faster activation of newly signed enterprise accounts."
             ]
+          },
+          {
+            "doc_id": "hr_hiring_plan",
+            "title": "HR headcount planning memo",
+            "mime_type": "text/plain",
+            "pages": [
+              "The talent acquisition team plans to hire 45 new engineers across three offices in Q2 and Q3.",
+              "Recruiting costs are expected to rise by 12% due to competitive market conditions in senior engineering roles."
+            ]
+          },
+          {
+            "doc_id": "customer_success_report",
+            "title": "Customer success quarterly report",
+            "mime_type": "text/plain",
+            "pages": [
+              "Average onboarding duration before guided automation was 14 weeks. After rollout, the average dropped to roughly 9 weeks.",
+              "Customer satisfaction scores for the onboarding phase rose from 3.6 to 4.2 on a 5-point scale. The CS team attributed the improvement primarily to shorter time-to-first-value.",
+              "Enterprise churn was concentrated among accounts with onboarding durations exceeding 16 weeks, reinforcing the link between faster onboarding and retention gains."
+            ]
           }
         ]
       }
@@ -135,16 +157,19 @@
     {
       "task_id": "solstice_logistics_medium",
       "difficulty": "medium",
-      "prompt_text": "Create a factual four-slide presentation for an operations leadership audience about Solstice Logistics Network Reset. Slide 1 should introduce the network reset and its objective. Slide 2 should explain the route and hub changes implemented. Slide 3 should summarize the measurable results, including on-time delivery improved from 91% to 96% and line-haul cost per package fell by 13%. Slide 4 should show a chart of quarterly package volume targets with values 52, 56, 61, and 68.",
+      "prompt_text": "Create a presentation for a non-technical operations leadership audience about Solstice Logistics Network Reset, covering why the reset was needed, what changed operationally, and the measurable results. Include a chart of quarterly package volume targets and a table summarizing the key performance improvements. Use four to five slides and keep the language accessible to leaders without logistics engineering backgrounds.",
       "task_constraints": {
         "min_slides": 4,
-        "max_slides": 4,
-        "target_audience": "operations leadership",
+        "max_slides": 5,
+        "target_audience": "non-technical operations leadership",
         "tone": "professional",
-        "extra_constraints": {}
+        "extra_constraints": {
+          "require_chart": true,
+          "require_table": true
+        }
       },
       "source_pack": {
-        "brief": "The packet includes network design actions, operating logic, and results. Keep route and hub changes together, and reserve the KPI slide for quantified outcomes.",
+        "brief": "This pack includes network design documents, operating rationale, performance results, and supplementary material. Some documents overlap in content, and one is only tangentially related. Key insights about why metrics improved require connecting the operational changes to the results across separate documents.",
         "documents": [
           {
             "doc_id": "network_brief",
@@ -173,23 +198,57 @@
               "Line-haul cost per package fell by 13% due to denser trailer utilization and fewer partial overnight runs.",
               "Quarterly package volume targets are 52, 56, 61, and 68 million parcels."
             ]
+          },
+          {
+            "doc_id": "fleet_maintenance_log",
+            "title": "Fleet maintenance and asset log",
+            "mime_type": "text/plain",
+            "pages": [
+              "Preventive maintenance intervals were shortened from 90 days to 60 days on high-utilization tractors.",
+              "Fleet availability held steady at 94% despite the shorter maintenance cycles, and roadside breakdown incidents declined by 18%."
+            ]
+          },
+          {
+            "doc_id": "carrier_partner_review",
+            "title": "Carrier partner performance review",
+            "mime_type": "text/plain",
+            "pages": [
+              "Three underperforming regional carriers were replaced after consistent SLA misses in the Southeast corridor.",
+              "The consolidated carrier base now handles 87% of final-mile volume through two primary partners, up from 61% across five partners before the reset.",
+              "Customer complaint rates in the Southeast corridor dropped by 31% within six weeks of the carrier swap."
+            ]
+          },
+          {
+            "doc_id": "warehouse_capacity_memo",
+            "title": "Warehouse capacity planning memo",
+            "mime_type": "text/plain",
+            "pages": [
+              "The Midwest distribution center is approaching 92% utilization and may require expansion by Q4.",
+              "Capital planning has allocated $14M for a potential 120,000 sq ft expansion, pending volume trajectory confirmation."
+            ]
           }
         ]
       }
     },
     {
-      "task_id": "northstar_growth_hard",
+      "task_id": "aurora_cloud_hard",
       "difficulty": "hard",
-      "prompt_text": "Create a factual five-slide presentation for an executive audience about Aurora Cloud Efficiency Program. Slide 1 should introduce the program and the strategic objective. Slide 2 should summarize the operating context and why efficiency matters for enterprise growth. Slide 3 should present the result that gross margin increased from 61% to 67%. Slide 4 should present the result that incident resolution time dropped by 41%. Slide 5 should show a revenue chart with quarterly target values 42, 48, 57, and 63.",
+      "prompt_text": "Create a compelling board-level presentation about the Aurora Cloud Efficiency Program. The board wants to understand whether the program delivered on its promises and how it positions the company for the next fiscal year. Include a comparison of pre-program and post-program performance, a revenue outlook with quarterly targets, and a clear recommendation on whether to extend the program. Use charts, tables, and accent bars where appropriate.",
       "task_constraints": {
-        "min_slides": 5,
-        "max_slides": 5,
-        "target_audience": "executive",
+        "min_slides": 4,
+        "max_slides": 7,
+        "target_audience": "board",
         "tone": "formal",
-        "extra_constraints": {}
+        "extra_constraints": {
+          "max_bullets_per_slide": 3,
+          "require_visual_per_slide": true,
+          "require_chart": true,
+          "require_table": true,
+          "theme_preference": "dark"
+        }
       },
       "source_pack": {
-        "brief": "This packet is aimed at an executive readout. Separate strategic context from outcome slides, and keep the chart focused on the revenue target sequence instead of mixing in unrelated metrics.",
+        "brief": "This is a large document pack prepared for a board readout. It contains operating briefs, financial results, growth context, program reviews, and infrastructure reports. Some documents provide overlapping or slightly inconsistent figures. The board expects a clear, synthesized narrative rather than a raw data dump. A recommendation on program extension is expected but not provided in the source material — the presenter must form one from the evidence.",
         "documents": [
           {
             "doc_id": "ops_brief",
@@ -218,6 +277,45 @@
               "Incident resolution time dropped by 41% after workflow consolidation.",
               "Quarterly revenue targets are 42, 48, 57, and 63 million dollars."
             ]
+          },
+          {
+            "doc_id": "infra_cost_report",
+            "title": "Infrastructure cost audit report",
+            "mime_type": "text/plain",
+            "pages": [
+              "Cloud compute spend declined by 19% quarter-over-quarter after right-sizing reserved instances and eliminating idle clusters.",
+              "Gross margin after the infrastructure changes was measured at 65.8% by the infrastructure finance team, reflecting a different cost allocation methodology than the program-level results sheet.",
+              "Storage costs remained flat despite a 28% increase in data volume, attributed to tiered storage policies and automated lifecycle rules."
+            ]
+          },
+          {
+            "doc_id": "customer_impact_survey",
+            "title": "Enterprise customer impact survey",
+            "mime_type": "text/plain",
+            "pages": [
+              "Net Promoter Score among enterprise accounts rose from 34 to 51 during the program period.",
+              "Customers cited faster incident response and more predictable performance as the top two improvements.",
+              "Three enterprise accounts flagged concerns about reduced support staffing levels, though overall satisfaction scores still improved."
+            ]
+          },
+          {
+            "doc_id": "program_review_draft",
+            "title": "Efficiency program internal review draft",
+            "mime_type": "text/plain",
+            "pages": [
+              "The program review committee noted that margin gains may partially reverse if reserved-instance commitments are not renewed at current discount tiers.",
+              "Incident resolution improvements were driven by consolidating three separate on-call rotations into one unified response team. Some senior engineers reported higher burnout risk under the new structure.",
+              "The committee recommended a six-month extension with a midpoint review, but this recommendation has not yet been endorsed by the CFO."
+            ]
+          },
+          {
+            "doc_id": "competitor_landscape",
+            "title": "Competitive landscape briefing",
+            "mime_type": "text/plain",
+            "pages": [
+              "Two major competitors launched aggressive pricing on comparable enterprise cloud tiers in Q2, compressing industry margins by an estimated 200-300 basis points.",
+              "Aurora's premium positioning depends on service reliability metrics that outperform competitors, making efficiency gains operationally necessary rather than optional."
+            ]
           }
         ]
       }
@@ -225,16 +323,22 @@
     {
       "task_id": "quarry_energy_hard",
       "difficulty": "hard",
-      "prompt_text": "Create a factual five-slide presentation for a board-level audience about Quarry Energy Capital Discipline Program. Slide 1 should introduce the program and the board concern it addresses. Slide 2 should summarize the spending controls and portfolio actions implemented. Slide 3 should explain the result that free cash flow margin increased from 9% to 15%. Slide 4 should explain the result that unplanned maintenance downtime fell by 28%. Slide 5 should show a capital deployment chart with quarterly values 110, 95, 88, and 92.",
+      "prompt_text": "Create a board-level presentation about Quarry Energy's Capital Discipline Program. The board needs to evaluate whether the spending controls improved capital efficiency without undermining growth capacity. Compare capital deployment across quarters, present the free cash flow and maintenance improvements, and assess whether the current capital allocation strategy is sustainable. Use charts, tables, and visual elements throughout.",
       "task_constraints": {
-        "min_slides": 5,
-        "max_slides": 5,
+        "min_slides": 4,
+        "max_slides": 7,
         "target_audience": "board",
         "tone": "formal",
-        "extra_constraints": {}
+        "extra_constraints": {
+          "max_bullets_per_slide": 3,
+          "require_visual_per_slide": true,
+          "require_chart": true,
+          "require_table": true,
+          "theme_preference": "dark"
+        }
       },
       "source_pack": {
-        "brief": "Board audiences will expect a clear distinction between the governance concern, the intervention, and the measured payoff. Use exact values for margin, downtime, and capital deployment.",
+        "brief": "This is a board-level document pack with financial results, operational data, program reviews, and external analysis. Some documents provide conflicting figures for the same metrics due to different measurement methodologies or time windows. The board expects a synthesized assessment of whether capital discipline is working without sacrificing growth, but no pre-formed conclusion is provided — the presenter must construct one from the evidence.",
         "documents": [
           {
             "doc_id": "board_pack",
@@ -262,6 +366,45 @@
               "Free cash flow margin increased from 9% to 15% over the following two quarters.",
               "Unplanned maintenance downtime fell by 28% after sensor-based inspections replaced fixed-interval checks on priority assets.",
               "Quarterly capital deployment values were 110, 95, 88, and 92 million dollars."
+            ]
+          },
+          {
+            "doc_id": "field_ops_report",
+            "title": "Field operations quarterly report",
+            "mime_type": "text/plain",
+            "pages": [
+              "Production output from existing wells declined by 3.2% quarter-over-quarter, which field engineers attributed to natural reservoir depletion rather than underinvestment.",
+              "The two deferred field expansions (Permian Block 7 and Eagle Ford South) had projected IRRs of 11% and 8% respectively. Block 7 was later reclassified as viable at current commodity prices.",
+              "Free cash flow margin measured at the field operations level was 13.4%, differing from the corporate-reported figure due to the exclusion of hedging gains and corporate overhead allocations."
+            ]
+          },
+          {
+            "doc_id": "sensor_program_review",
+            "title": "Predictive maintenance sensor program review",
+            "mime_type": "text/plain",
+            "pages": [
+              "Sensor-based predictive maintenance was deployed across 74% of priority assets by end of Q2.",
+              "Unplanned downtime on sensor-equipped assets fell by 34%, while non-equipped assets saw only a 12% reduction. The blended fleet-wide figure of 28% reflects the partial rollout.",
+              "Sensor deployment cost $4.2M in Q1-Q2, with an estimated payback period of 14 months based on avoided downtime costs."
+            ]
+          },
+          {
+            "doc_id": "commodity_outlook",
+            "title": "Commodity price outlook memo",
+            "mime_type": "text/plain",
+            "pages": [
+              "WTI crude is forecast to trade in the $68-$78 range over the next four quarters, with downside risk from OPEC+ production increases.",
+              "At $72 per barrel, the deferred Permian Block 7 expansion would generate a 13% IRR — above the company's 10% hurdle rate. Eagle Ford South remains marginal at 7.5% IRR under the same assumptions."
+            ]
+          },
+          {
+            "doc_id": "investor_relations_feedback",
+            "title": "Investor relations feedback summary",
+            "mime_type": "text/plain",
+            "pages": [
+              "Institutional investors expressed support for capital discipline but flagged a potential growth gap if deferrals extend beyond two quarters.",
+              "Three of the top ten shareholders specifically asked about the timeline for restarting the Permian Block 7 project.",
+              "Sell-side analysts noted that Quarry's free cash flow yield has improved from the bottom quartile to the top quartile of its peer group."
             ]
           }
         ]
