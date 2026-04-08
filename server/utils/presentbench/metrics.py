@@ -30,15 +30,12 @@ def compute_presentation_diagnostics(
         if slide.text_metrics.get("min_font_size_pt") is not None
     ]
     overlap_ratios = [compute_overlap_ratio(slide) for slide in extraction.slides]
-    blank_count = sum(
-        1 for slide in extraction.slides if is_blank_or_title_only(slide)
-    )
+    blank_count = sum(1 for slide in extraction.slides if is_blank_or_title_only(slide))
     all_fonts = {
         font
         for slide in extraction.slides
         for font in slide.text_metrics.get("unique_font_families", [])
     }
-    citation_count = sum(len(slide.citations) for slide in extraction.slides)
     return {
         "slide_count": extraction.slide_count,
         "slide_count_violation": int(
@@ -54,10 +51,6 @@ def compute_presentation_diagnostics(
         "blank_title_only_ratio": (blank_count / extraction.slide_count)
         if extraction.slide_count
         else 1.0,
-        "citation_count": citation_count,
-        "citation_coverage_ratio": (citation_count / extraction.slide_count)
-        if extraction.slide_count
-        else 0.0,
         "min_font_size_pt": min(min_font_sizes) if min_font_sizes else None,
         "max_overlap_ratio": max(overlap_ratios) if overlap_ratios else 0.0,
         "unique_font_family_count": len(all_fonts),
@@ -182,18 +175,20 @@ def score_checklist_item(
         if verdict and item.item_kind == "correct_required_point":
             verdict = _source_supported(requirement, task_spec)
         evidence = {"requirement": requirement}
-    elif item.item_kind == "citation_coverage":
-        verdict = diagnostics["citation_count"] >= max(1, extraction.slide_count // 3)
-        evidence = {"citation_count": diagnostics["citation_count"]}
     elif item.item_kind == "slide_fidelity":
         target_slides = [
-            slide for slide in extraction.slides
+            slide
+            for slide in extraction.slides
             if slide.slide_index in (item.required_slide_scope or [])
         ]
-        verdict = all(
-            _source_supported(slide_text_corpus(slide), task_spec)
-            for slide in target_slides
-        ) if target_slides else True
+        verdict = (
+            all(
+                _source_supported(slide_text_corpus(slide), task_spec)
+                for slide in target_slides
+            )
+            if target_slides
+            else True
+        )
     elif item.item_kind == "deck_fidelity":
         verdict = all(
             _source_supported(slide_text_corpus(slide), task_spec)

@@ -5,6 +5,7 @@ import logging
 import re
 from typing import Any, Protocol
 
+from server.debug_logging import write_debug_event
 from server.llm_client import LLMClient
 from server.utils.reward_models import (
     QuizEvidence,
@@ -333,6 +334,15 @@ class SlidesGenQuizBankService:
             return questions, metadata
         except Exception as error:
             logger.warning("quizbank fallback enabled: %s", error)
+            write_debug_event(
+                "quizbank.fallback",
+                {
+                    "error": str(error),
+                    "target_total": target_total,
+                    "qualitative_target": qualitative_target,
+                    "quantitative_target": quantitative_target,
+                },
+            )
             questions = self._build_fallback_questions(
                 task_spec,
                 source_pack,
@@ -363,7 +373,11 @@ class SlidesGenQuizBankService:
         logger.info("quizbank stage start stage=%s", stage_name)
         try:
             payload = self.llm_client.chat_json(
-                system_prompt, user_prompt, temperature=0.0, max_tokens=max_tokens
+                system_prompt,
+                user_prompt,
+                temperature=0.0,
+                max_tokens=max_tokens,
+                debug_stage=stage_name,
             )
         except Exception as error:
             logger.warning("quizbank stage failed stage=%s error=%s", stage_name, error)
@@ -371,6 +385,13 @@ class SlidesGenQuizBankService:
         if not isinstance(payload, dict):
             raise ValueError(f"{stage_name} must return a JSON object")
         logger.info("quizbank stage success stage=%s", stage_name)
+        write_debug_event(
+            "quizbank.stage_success",
+            {
+                "stage": stage_name,
+                "max_tokens": max_tokens,
+            },
+        )
         return payload, {"max_tokens": max_tokens}
 
     def _extract_evidence(

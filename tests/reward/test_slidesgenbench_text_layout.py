@@ -38,7 +38,7 @@ def _make_source_pack() -> SourcePack:
 def _make_editor() -> PptxEditor:
     editor = PptxEditor()
 
-    slide_index = editor.add_slide(6)
+    slide_index = editor.add_slide()
     slide_id = editor.get_slide_id(slide_index)
     good_title = editor.add_textbox_by_id(slide_id, 0.8, 0.6, 5.6, 0.7)
     good_body = editor.add_textbox_by_id(slide_id, 0.9, 1.7, 6.8, 1.4)
@@ -51,7 +51,7 @@ def _make_editor() -> PptxEditor:
     editor.style_text_by_id(slide_id, good_title, font_size_pt=28, color_hex="183153")
     editor.style_text_by_id(slide_id, good_body, font_size_pt=18, color_hex="243B53")
 
-    slide_index = editor.add_slide(6)
+    slide_index = editor.add_slide()
     slide_id = editor.get_slide_id(slide_index)
     cropped_title = editor.add_textbox_by_id(slide_id, 0.8, 0.5, 3.8, 0.6)
     dense_body = editor.add_textbox_by_id(slide_id, 0.8, 1.6, 7.2, 1.4)

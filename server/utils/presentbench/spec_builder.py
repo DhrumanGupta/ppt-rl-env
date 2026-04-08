@@ -27,7 +27,6 @@ DEFAULT_PRESENTBENCH_SCORING_CONFIG = {
     "soft_penalties": {
         "slide_count_violation": 0.02,
         "overlap": 0.01,
-        "missing_citations": 0.01,
         "tiny_text": 0.01,
         "redundancy": 0.03,
         "wrong_slot_behavior": 0.02,
@@ -109,16 +108,6 @@ def generate_checklist(task_spec: TaskSpec) -> list[ChecklistItem]:
                 prompt_text=f"Is this required point stated correctly: {point}?",
                 item_kind="correct_required_point",
                 source_refs=source_refs,
-            )
-        )
-
-    if task_spec.citation_required:
-        checklist.append(
-            ChecklistItem(
-                item_id="correctness_citations",
-                dimension="correctness",
-                prompt_text="Are factual claims supported with citation-like content where needed?",
-                item_kind="citation_coverage",
             )
         )
 

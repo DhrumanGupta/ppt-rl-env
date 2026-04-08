@@ -86,16 +86,6 @@ def test_create_slide_creates_mixed_shapes_and_named_shape_mapping(themed_editor
                     "color_hex": "<primary>",
                 },
             },
-            {
-                "type": "citation",
-                "name": "citation",
-                "text": "Source: Example",
-                "style": {
-                    "font_name": "<font>",
-                    "font_size_pt": "<caption_size>",
-                    "color_hex": "<secondary>",
-                },
-            },
         ],
     )
 

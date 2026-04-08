@@ -130,10 +130,6 @@ def _extract_required_shape_kinds(instruction: str) -> list[str]:
         required.append("table")
     if any(keyword in lowered for keyword in ("image", "photo", "diagram", "visual")):
         required.append("image")
-    if any(
-        keyword in lowered for keyword in ("citation", "cite", "source", "reference")
-    ):
-        required.append("citation")
     if any(keyword in lowered for keyword in ("title", "headline", "bullet", "text")):
         required.append("text")
     return sorted(set(required))
@@ -174,11 +170,6 @@ def parse_required_slides(prompt: str) -> list[RequiredSlideSpec]:
                 required_points=_extract_required_points(instruction),
                 required_exact_values=_extract_exact_values(instruction),
                 required_shape_kinds=_extract_required_shape_kinds(instruction),
-                citation_required=bool(
-                    re.search(
-                        r"cite|citation|source|reference", instruction, re.IGNORECASE
-                    )
-                ),
                 metadata={"raw_instruction": instruction},
             )
         )
@@ -262,7 +253,6 @@ def build_task_spec(
     min_slides, max_slides = _infer_slide_constraints(
         prompt, task_constraints, required_slides
     )
-    citation_required = True
     require_quantitative_content = bool(
         re.search(
             r"chart|table|metric|data|quant|compare|percentage|percent|trend",
@@ -302,7 +292,6 @@ def build_task_spec(
         required_sections=required_sections,
         required_points=required_points,
         required_slides=required_slides or None,
-        citation_required=citation_required,
         require_quantitative_content=require_quantitative_content,
         metadata={
             "source_digest": source_pack_digest(source_pack),

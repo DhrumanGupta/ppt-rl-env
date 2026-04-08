@@ -6,7 +6,6 @@ from typing import Any
 SUPPORTED_SHAPE_KINDS = {
     "accent_bar",
     "text",
-    "citation",
     "chart",
     "table",
     "image",
@@ -109,7 +108,6 @@ class ExtractedSlide:
     background_color_hex: str | None = None
     title_text: str | None = None
     all_text: str = ""
-    citations: list[str] = field(default_factory=list)
     shapes: list[ExtractedShape] = field(default_factory=list)
     text_metrics: dict[str, Any] = field(default_factory=dict)
     layout_metrics: dict[str, Any] = field(default_factory=dict)
@@ -153,7 +151,6 @@ class RequiredSlideSpec:
     required_points: list[str] = field(default_factory=list)
     required_exact_values: list[str] = field(default_factory=list)
     required_shape_kinds: list[str] = field(default_factory=list)
-    citation_required: bool = False
     metadata: dict[str, Any] = field(default_factory=dict)
 
 
@@ -168,7 +165,6 @@ class TaskSpec:
     required_sections: list[str] = field(default_factory=list)
     required_points: list[str] = field(default_factory=list)
     required_slides: list[RequiredSlideSpec] | None = None
-    citation_required: bool = False
     require_quantitative_content: bool = False
     metadata: dict[str, Any] = field(default_factory=dict)
 

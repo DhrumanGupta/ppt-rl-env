@@ -80,8 +80,6 @@ def score_presentbench(
         "slide_count_violation": penalty_config["slide_count_violation"]
         * diagnostics["slide_count_violation"],
         "overlap": penalty_config["overlap"] * diagnostics["max_overlap_ratio"],
-        "missing_citations": penalty_config["missing_citations"]
-        * max(0.0, 1.0 - diagnostics["citation_coverage_ratio"]),
         "tiny_text": penalty_config["tiny_text"]
         * (
             1.0
@@ -206,13 +204,9 @@ def score_presentbench_slide(
     overlap = compute_overlap_ratio(slide_extraction)
     min_font = slide_extraction.text_metrics.get("min_font_size_pt")
     redundancy = redundancy_score(slide_extraction, previous_slide_extractions)
-    missing_citation = float(
-        target_slide.citation_required and not slide_extraction.citations
-    )
     wrong_slot_behavior = 0.0 if s_prompt_alignment >= 1.0 else 1.0
 
     soft_penalties = {
-        "missing_citation": penalty_config["missing_citations"] * missing_citation,
         "redundancy": penalty_config["redundancy"] * redundancy,
         "wrong_slot_behavior": penalty_config["wrong_slot_behavior"]
         * wrong_slot_behavior,

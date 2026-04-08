@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import hashlib
-import re
 from collections import Counter
 from dataclasses import dataclass
 from io import BytesIO
@@ -19,12 +18,6 @@ from server.utils.reward_models import (
     ExtractedSlide,
     ExtractedTable,
     ExtractedTextBlock,
-)
-
-
-_CITATION_PATTERN = re.compile(
-    r"^\s*(source|sources|citation|citations|reference|references)\s*[:\-]",
-    re.IGNORECASE,
 )
 
 
@@ -272,11 +265,6 @@ def _shape_kind(shape: Any, slide_height_in: float) -> tuple[str, str | None]:
     if top <= 0.3 and left <= 0.2 and width >= 10 and height <= 0.6:
         return "accent_bar", "accent_bar"
     if getattr(shape, "has_text_frame", False):
-        text = shape.text_frame.text or ""
-        if _CITATION_PATTERN.search(text) or (
-            top >= max(slide_height_in - 1.2, 0) and height <= 0.7
-        ):
-            return "citation", "citation"
         return "text", None
     return "unknown", None
 
@@ -406,9 +394,7 @@ def _layout_metrics(
     return {
         "shape_count": len(shapes),
         "occupied_area_ratio": (occupied_area / slide_area) if slide_area else 0.0,
-        "text_shape_count": sum(
-            1 for shape in shapes if shape.shape_kind in {"text", "citation"}
-        ),
+        "text_shape_count": sum(1 for shape in shapes if shape.shape_kind == "text"),
         "chart_count": sum(1 for shape in shapes if shape.shape_kind == "chart"),
         "table_count": sum(1 for shape in shapes if shape.shape_kind == "table"),
         "image_count": sum(1 for shape in shapes if shape.shape_kind == "image"),
@@ -497,11 +483,6 @@ class PptxExtractionService:
             for z_index, shape in enumerate(slide.shapes)
         ]
 
-        citations = [
-            shape.raw_text
-            for shape in shapes
-            if shape.shape_kind == "citation" and shape.raw_text
-        ]
         font_metrics = _font_metrics(shapes)
         title_text = None
         try:
@@ -522,7 +503,6 @@ class PptxExtractionService:
             background_color_hex=_background_hex(slide),
             title_text=title_text,
             all_text="\n".join(_shape_texts(shapes)).strip(),
-            citations=[citation for citation in citations if citation],
             shapes=shapes,
             text_metrics={
                 **font_metrics,

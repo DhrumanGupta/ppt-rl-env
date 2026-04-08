@@ -40,7 +40,7 @@ def _persist_inspection_artifacts(
 
     editor = PptxEditor()
     for image_path in persisted_paths:
-        slide_index = editor.add_slide(6)
+        slide_index = editor.add_slide()
         editor.add_image(slide_index, image_path, 0.0, 0.0, cx=10.0, cy=7.5)
     editor.prs.save(str(deck_root / f"{deck_name}.pptx"))
     return persisted_paths

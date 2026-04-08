@@ -79,16 +79,6 @@ def _slide_two_payload() -> dict:
                     "color_hex": "<secondary>",
                 },
             },
-            {
-                "type": "citation",
-                "name": "citation",
-                "text": "Source: Northstar plan memo",
-                "style": {
-                    "font_name": "<font>",
-                    "font_size_pt": "<caption_size>",
-                    "color_hex": "<secondary>",
-                },
-            },
         ],
     }
 

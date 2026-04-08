@@ -33,7 +33,7 @@ def _make_source_pack() -> SourcePack:
 def _make_editor() -> PptxEditor:
     editor = PptxEditor()
 
-    slide_index = editor.add_slide(6)
+    slide_index = editor.add_slide()
     slide_id = editor.get_slide_id(slide_index)
     editor.set_slide_background_by_id(slide_id, "F6F8FC")
     title_id = editor.add_textbox_by_id(slide_id, 0.7, 0.6, 8.2, 0.8)
@@ -43,7 +43,7 @@ def _make_editor() -> PptxEditor:
     editor.style_text_by_id(slide_id, title_id, font_size_pt=28, color_hex="183153")
     editor.style_text_by_id(slide_id, body_id, font_size_pt=18, color_hex="243B53")
 
-    slide_index = editor.add_slide(6)
+    slide_index = editor.add_slide()
     slide_id = editor.get_slide_id(slide_index)
     editor.set_slide_background_by_id(slide_id, "FFF9F0")
     title_id = editor.add_textbox_by_id(slide_id, 0.7, 0.6, 8.2, 0.8)

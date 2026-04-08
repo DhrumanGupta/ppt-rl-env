@@ -3,7 +3,6 @@ from __future__ import annotations
 import asyncio
 import json
 import os
-from pathlib import Path
 import re
 import textwrap
 from typing import Any
@@ -28,7 +27,6 @@ TASK_DIFFICULTY = os.getenv("TASK_DIFFICULTY", "easy")
 MAX_STEPS = int(os.getenv("MAX_STEPS", "8"))
 TEMPERATURE = float(os.getenv("TEMPERATURE", "0.1"))
 MAX_TOKENS = int(os.getenv("MAX_TOKENS", "700"))
-DEBUG = os.getenv("DEBUG", "false").strip().lower() in {"1", "true", "yes", "on"}
 
 BENCHMARK = "ppt_agent"
 
@@ -63,7 +61,6 @@ SYSTEM_PROMPT = textwrap.dedent(
     - Use short, high-signal bullets that highlight decisions, outcomes, comparisons, or implications.
     - Make the slide sequence feel intentional: opening context first, evidence and analysis in the middle, quantitative visuals where appropriate, then save.
     - When a metric or claim comes from the source pack, preserve the factual wording and numbers accurately.
-    - Use citations when the prompt asks for them or when a factual result slide would benefit from attribution.
     - Keep density reasonable. It is better to make an additional focused slide than to overload one slide.
 
     Examples of good presentation judgment:
@@ -98,8 +95,7 @@ SYSTEM_PROMPT = textwrap.dedent(
     2. bullets
        content = {
          "title": "slide title",
-         "body_lines": ["fact line 1", "fact line 2"],
-         "citation": "Source: ..." | null
+         "body_lines": ["fact line 1", "fact line 2"]
        }
 
     3. chart
@@ -108,9 +104,8 @@ SYSTEM_PROMPT = textwrap.dedent(
          "chart_title": "chart title",
          "categories": ["Q1", "Q2", "Q3", "Q4"],
          "series_name": "series label",
-         "values": [1, 2, 3, 4],
-         "citation": "Source: ..." | null
-       }
+         "values": [1, 2, 3, 4]
+        }
 
     If action_type is save_presentation:
     - set slide_kind to null
@@ -157,26 +152,6 @@ def _default_output_path(task_name: str, difficulty: str) -> str:
     safe_task = task_name or "presentation"
     safe_difficulty = difficulty or "unknown"
     return os.path.join("outputs", f"{safe_task}_{safe_difficulty}_inference.pptx")
-
-
-def _debug_log_path(task_name: str, difficulty: str) -> str:
-    safe_task = task_name or "presentation"
-    safe_difficulty = difficulty or "unknown"
-    return os.path.join("outputs", f"{safe_task}_{safe_difficulty}_debug.json")
-
-
-def _write_debug_log(path: str, payload: dict[str, Any]) -> None:
-    output_path = Path(path)
-    output_path.parent.mkdir(parents=True, exist_ok=True)
-    output_path.write_text(
-        json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8"
-    )
-
-
-def _reward_details(observation: Any) -> dict[str, Any]:
-    metadata = getattr(observation, "metadata", None) or {}
-    reward_details = metadata.get("reward_details")
-    return reward_details if isinstance(reward_details, dict) else {}
 
 
 def _infer_target_slide_count(task_prompt: str) -> int | None:
@@ -266,26 +241,6 @@ def _require_number_list(payload: dict[str, Any], key: str) -> list[float]:
     return normalized
 
 
-def _optional_citation_shape(content: dict[str, Any]) -> list[dict[str, Any]]:
-    citation = content.get("citation")
-    if citation is None:
-        return []
-    if not isinstance(citation, str) or not citation.strip():
-        raise ValueError("citation must be null or a non-empty string")
-    return [
-        {
-            "type": "citation",
-            "name": "citation",
-            "text": citation.strip(),
-            "style": {
-                "font_name": "<font>",
-                "font_size_pt": "<caption_size>",
-                "color_hex": "<secondary>",
-            },
-        }
-    ]
-
-
 def _normalize_create_slide_payload(
     slide_kind: str, content: dict[str, Any]
 ) -> dict[str, Any]:
@@ -361,7 +316,6 @@ def _normalize_create_slide_payload(
                         "color_hex": "<secondary>",
                     },
                 },
-                *_optional_citation_shape(content),
             ],
         }
 
@@ -411,7 +365,6 @@ def _normalize_create_slide_payload(
                         "series_colors": ["<accent>"],
                     },
                 },
-                *_optional_citation_shape(content),
             ],
         }
 
@@ -546,12 +499,10 @@ async def main() -> None:
     client = OpenAI(base_url=API_BASE_URL, api_key=HF_TOKEN)
     rewards: list[float] = []
     history: list[dict[str, Any]] = []
-    debug_steps: list[dict[str, Any]] = []
     steps_taken = 0
     score = 0.0
     success = False
     started = False
-    debug_log_path: str | None = None
 
     try:
         async with PptAgentEnv(base_url=ENV_BASE_URL, message_timeout_s=180.0) as env:
@@ -563,11 +514,6 @@ async def main() -> None:
                 model=MODEL_NAME,
             )
             started = True
-            if DEBUG:
-                debug_log_path = _debug_log_path(
-                    observation.task_name,
-                    observation.difficulty,
-                )
 
             for step in range(1, MAX_STEPS + 1):
                 if result.done:
@@ -581,34 +527,6 @@ async def main() -> None:
                 rewards.append(reward)
                 history.append(history_entry)
                 steps_taken = step
-                if DEBUG and debug_log_path is not None:
-                    debug_steps.append(
-                        {
-                            "step": step,
-                            "action": {
-                                "action_type": action.action_type,
-                                "slide_index": action.slide_index,
-                                "payload": action.payload,
-                            },
-                            "reward": reward,
-                            "done": result.done,
-                            "error": observation.last_action_error,
-                            "score": float(observation.score or 0.0),
-                            "last_action_result": observation.last_action_result,
-                            "reward_details": _reward_details(observation),
-                        }
-                    )
-                    _write_debug_log(
-                        debug_log_path,
-                        {
-                            "task_name": observation.task_name,
-                            "difficulty": observation.difficulty,
-                            "model": MODEL_NAME,
-                            "env": BENCHMARK,
-                            "debug": True,
-                            "steps": debug_steps,
-                        },
-                    )
                 log_step(
                     step=step,
                     action=action_str,
@@ -626,23 +544,6 @@ async def main() -> None:
                 and observation.score > 0.0
             )
             score = float(observation.score or 0.0)
-            if DEBUG and debug_log_path is not None:
-                _write_debug_log(
-                    debug_log_path,
-                    {
-                        "task_name": observation.task_name,
-                        "difficulty": observation.difficulty,
-                        "model": MODEL_NAME,
-                        "env": BENCHMARK,
-                        "debug": True,
-                        "success": success,
-                        "score": score,
-                        "steps_taken": steps_taken,
-                        "rewards": rewards,
-                        "steps": debug_steps,
-                        "final_reward_details": _reward_details(observation),
-                    },
-                )
     except Exception as error:
         print(f"[DEBUG] inference failed: {error}", flush=True)
         success = False

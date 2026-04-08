@@ -147,30 +147,6 @@ def _create_text(
     return shape_id
 
 
-def _create_citation(
-    editor: PptxEditor, slide_id: int, spec: Dict[str, Any], theme_name: str
-) -> int:
-    shape_id = editor.add_textbox_by_id(
-        slide_id,
-        spec.get("x", 0.5),
-        spec.get("y", 6.8),
-        spec.get("w", 9.0),
-        spec.get("h", 0.4),
-    )
-    editor.insert_text_by_id(slide_id, shape_id, _get_required(spec, "text"))
-
-    style = {"font_size_pt": 10, "italic": True}
-    style.update(spec.get("style", {}))
-    editor.style_text_by_id(
-        slide_id,
-        shape_id,
-        theme_name=theme_name,
-        bind_theme=True,
-        **style,
-    )
-    return shape_id
-
-
 def _create_chart(
     editor: PptxEditor, slide_id: int, spec: Dict[str, Any], theme_name: str
 ) -> int:
@@ -247,16 +223,6 @@ def _update_text(
             bind_theme=True,
             **spec["style"],
         )
-    return shape_id
-
-
-def _update_citation(
-    editor: PptxEditor, slide_id: int, spec: Dict[str, Any], theme_name: str
-) -> int:
-    shape_id = _update_text(editor, slide_id, spec, theme_name)
-    shape = editor._get_shape_by_id(slide_id, shape_id)
-    if not shape.has_text_frame:
-        raise ValueError("Shape has no text frame.")
     return shape_id
 
 
@@ -345,7 +311,6 @@ def _update_image(
 _CREATE_DISPATCH = {
     "accent_bar": _create_accent_bar,
     "text": _create_text,
-    "citation": _create_citation,
     "chart": _create_chart,
     "table": _create_table,
     "image": _create_image,
@@ -354,7 +319,6 @@ _CREATE_DISPATCH = {
 _UPDATE_DISPATCH = {
     "accent_bar": _update_accent_bar,
     "text": _update_text,
-    "citation": _update_citation,
     "chart": _update_chart,
     "table": _update_table,
     "image": _update_image,
@@ -399,12 +363,11 @@ def delete_slide(editor: PptxEditor, slide_id: int) -> Dict[str, Any]:
 def create_slide(
     editor: PptxEditor,
     *,
-    layout_index: int = 6,
     theme_name: str = "default",
     background_color: Optional[str] = None,
     shapes: Optional[list[Dict[str, Any]]] = None,
 ) -> Dict[str, Any]:
-    slide_index = editor.add_slide(layout_index)
+    slide_index = editor.add_slide()
     slide_id = editor.get_slide_id(slide_index)
     result = {"slide_id": slide_id, "shape_ids": [], "named_shapes": {}}
 

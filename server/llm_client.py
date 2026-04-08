@@ -7,7 +7,30 @@ import re
 
 from openai import OpenAI
 
+from server.debug_logging import write_debug_event
+
 logger = logging.getLogger(__name__)
+
+
+def _exception_payload(error: Exception) -> dict[str, object]:
+    payload: dict[str, object] = {
+        "error": str(error),
+        "error_type": error.__class__.__name__,
+        "error_repr": repr(error),
+    }
+    if getattr(error, "args", None):
+        payload["error_args"] = [str(arg) for arg in error.args]
+    cause = error.__cause__
+    if cause is not None:
+        payload["cause_type"] = cause.__class__.__name__
+        payload["cause"] = str(cause)
+        payload["cause_repr"] = repr(cause)
+    context = error.__context__
+    if context is not None and context is not cause:
+        payload["context_type"] = context.__class__.__name__
+        payload["context"] = str(context)
+        payload["context_repr"] = repr(context)
+    return payload
 
 
 class LLMClient:
@@ -34,13 +57,31 @@ class LLMClient:
         )
 
     def chat(
-        self, system: str, user: str, temperature: float = 0.3, max_tokens: int = 1024
+        self,
+        system: str,
+        user: str,
+        temperature: float = 0.3,
+        max_tokens: int = 1024,
+        *,
+        debug_stage: str | None = None,
     ) -> str:
         """Send a chat completion request. Returns the raw response text."""
-        return self._chat_openai(system, user, temperature, max_tokens)
+        return self._chat_openai(
+            system,
+            user,
+            temperature,
+            max_tokens,
+            debug_stage=debug_stage,
+        )
 
     def chat_json(
-        self, system: str, user: str, temperature: float = 0.3, max_tokens: int = 1024
+        self,
+        system: str,
+        user: str,
+        temperature: float = 0.3,
+        max_tokens: int = 1024,
+        *,
+        debug_stage: str | None = None,
     ) -> dict:
         """Send a chat request and parse the response as JSON."""
         raw = self._chat_openai(
@@ -49,6 +90,7 @@ class LLMClient:
             temperature,
             max_tokens,
             json_mode=True,
+            debug_stage=debug_stage,
         )
         return self._parse_json(raw)
 
@@ -108,6 +150,7 @@ class LLMClient:
         max_tokens: int,
         *,
         json_mode: bool = False,
+        debug_stage: str | None = None,
     ) -> str:
         request_kwargs = {
             "model": self.model,
@@ -121,12 +164,61 @@ class LLMClient:
         if json_mode:
             request_kwargs["response_format"] = {"type": "json_object"}
 
+        stage = debug_stage or "chat"
+        write_debug_event(
+            "llm.request",
+            {
+                "stage": stage,
+                "model": self.model,
+                "base_url": self.base_url,
+                "json_mode": json_mode,
+                "temperature": temperature,
+                "max_tokens": max_tokens,
+                "system": system,
+                "user": user,
+            },
+        )
+
         try:
             response = self.client.chat.completions.create(**request_kwargs)
-        except Exception:
+        except Exception as error:
             if not json_mode:
+                write_debug_event(
+                    "llm.error",
+                    {
+                        "stage": stage,
+                        "model": self.model,
+                        "base_url": self.base_url,
+                        "json_mode": json_mode,
+                        **_exception_payload(error),
+                    },
+                )
                 raise
             request_kwargs.pop("response_format", None)
-            response = self.client.chat.completions.create(**request_kwargs)
+            try:
+                response = self.client.chat.completions.create(**request_kwargs)
+            except Exception as retry_error:
+                write_debug_event(
+                    "llm.error",
+                    {
+                        "stage": stage,
+                        "model": self.model,
+                        "base_url": self.base_url,
+                        "json_mode": json_mode,
+                        **_exception_payload(retry_error),
+                        "response_format_retry": True,
+                    },
+                )
+                raise
 
-        return self._extract_chat_content(response.choices[0].message.content)
+        content = self._extract_chat_content(response.choices[0].message.content)
+        write_debug_event(
+            "llm.response",
+            {
+                "stage": stage,
+                "model": self.model,
+                "json_mode": json_mode,
+                "content": content,
+            },
+        )
+        return content

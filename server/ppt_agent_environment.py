@@ -10,6 +10,7 @@ from uuid import uuid4
 from openenv.core.env_server.interfaces import Environment
 from openenv.core.env_server.types import State
 
+from server.debug_logging import debug_context, write_debug_event
 from server.llm_client import LLMClient
 from server.task_registry import DEFAULT_TASK_REGISTRY, TaskRegistry, TaskScenario
 from server.tools.pptx_tools import (
@@ -109,37 +110,65 @@ class PptAgentEnvironment(Environment):
     ) -> PptAgentObservation:
         requested_task_id = kwargs.get("task_id")
         requested_difficulty = kwargs.get("difficulty")
-        logger.info("env.reset start episode_id=%s seed=%s", episode_id, seed)
-        self._reset_rubric()
-        if seed is not None:
-            self._rng.seed(seed)
-            self._scenario_queue = []
+        next_episode_id = episode_id or str(uuid4())
+        with debug_context(episode_id=next_episode_id):
+            logger.info("env.reset start episode_id=%s seed=%s", next_episode_id, seed)
+            write_debug_event(
+                "env.reset.start",
+                {
+                    "seed": seed,
+                    "requested_task_id": requested_task_id,
+                    "requested_difficulty": requested_difficulty,
+                },
+            )
+            self._reset_rubric()
+            if seed is not None:
+                self._rng.seed(seed)
+                self._scenario_queue = []
 
-        self._done = False
-        self._termination_reason = None
-        self._last_score = 0.0
-        self._last_action_result = None
-        self._last_reward_details = None
-        self._scenario = self._resolve_scenario(
-            task_id=requested_task_id,
-            difficulty=requested_difficulty,
-        )
-        logger.info("env.reset sampled task task_id=%s", self._scenario.task_id)
-        self._eval_spec = self._build_eval_spec(self._scenario)
-        self._editor = self._initialize_editor(self._scenario.theme)
-        self._state = State(episode_id=episode_id or str(uuid4()), step_count=0)
-        logger.info(
-            "env.reset ready episode_id=%s task_id=%s max_steps=%s",
-            self._state.episode_id,
-            self._scenario.task_id,
-            self._max_steps,
-        )
+            self._done = False
+            self._termination_reason = None
+            self._last_score = 0.0
+            self._last_action_result = None
+            self._last_reward_details = None
+            self._scenario = self._resolve_scenario(
+                task_id=requested_task_id,
+                difficulty=requested_difficulty,
+            )
+            with debug_context(
+                task_id=self._scenario.task_id,
+                difficulty=self._scenario.difficulty,
+            ):
+                logger.info("env.reset sampled task task_id=%s", self._scenario.task_id)
+                write_debug_event(
+                    "env.reset.scenario",
+                    {
+                        "task_id": self._scenario.task_id,
+                        "difficulty": self._scenario.difficulty,
+                    },
+                )
+                self._eval_spec = self._build_eval_spec(self._scenario)
+                self._editor = self._initialize_editor(self._scenario.theme)
+                self._state = State(episode_id=next_episode_id, step_count=0)
+                logger.info(
+                    "env.reset ready episode_id=%s task_id=%s max_steps=%s",
+                    self._state.episode_id,
+                    self._scenario.task_id,
+                    self._max_steps,
+                )
+                write_debug_event(
+                    "env.reset.ready",
+                    {
+                        "max_steps": self._max_steps,
+                        "spec_hash": self._eval_spec.spec_hash,
+                    },
+                )
 
-        return self._build_observation(
-            reward=0.0,
-            done=False,
-            last_action_error=None,
-        )
+                return self._build_observation(
+                    reward=0.0,
+                    done=False,
+                    last_action_error=None,
+                )
 
     def step(
         self,
@@ -157,87 +186,144 @@ class PptAgentEnvironment(Environment):
                 last_action_error="Episode already terminated",
             )
 
-        self._state.step_count += 1
-        logger.info(
-            "env.step start episode_id=%s step=%s action_type=%s slide_index=%s",
-            self._state.episode_id,
-            self._state.step_count,
-            action.action_type,
-            action.slide_index,
-        )
-        reward = 0.0
-        invalid_reason: str | None = None
-        inspection: ExtractedPresentation | None = None
-
-        try:
-            execution_result = self._execute_action(action)
-            self._last_action_result = {
-                "action_type": execution_result.action_type,
-                "tool_result": execution_result.tool_result,
-            }
-            if execution_result.affected_slide_index is not None:
-                inspection = self._inspection_service.inspect_presentation(self._editor)
-                intermediate_result = self._score_intermediate_step(
-                    slide_index=execution_result.affected_slide_index,
-                    inspection=inspection,
-                )
-                reward = intermediate_result.reward_total
-                self._last_reward_details = {
-                    "kind": "intermediate_slide",
-                    "result": to_serializable(intermediate_result),
-                }
-            else:
-                reward = execution_result.reward
-                self._last_reward_details = {
-                    "kind": "action",
-                    "result": {"reward_total": reward},
-                }
+        with debug_context(
+            episode_id=self._state.episode_id,
+            task_id=self._scenario.task_id,
+            difficulty=self._scenario.difficulty,
+        ):
+            self._state.step_count += 1
             logger.info(
-                "env.step action complete episode_id=%s step=%s action_type=%s reward=%s tool_result=%s",
+                "env.step start episode_id=%s step=%s action_type=%s slide_index=%s",
                 self._state.episode_id,
                 self._state.step_count,
                 action.action_type,
-                reward,
-                execution_result.tool_result,
+                action.slide_index,
             )
-        except (IndexError, KeyError, ValueError) as error:
-            invalid_reason = str(error)
-            reward = _INVALID_ACTION_PENALTY
-            self._last_action_result = None
-            self._last_reward_details = {
-                "kind": "invalid_action",
-                "result": {"reward_total": reward, "error": invalid_reason},
-            }
-            logger.warning(
-                "env.step invalid action episode_id=%s step=%s action_type=%s error=%s",
+            write_debug_event(
+                "env.step.start",
+                {
+                    "step": self._state.step_count,
+                    "action": action.model_dump(mode="json"),
+                },
+            )
+            reward = 0.0
+            invalid_reason: str | None = None
+            inspection: ExtractedPresentation | None = None
+
+            try:
+                execution_result = self._execute_action(action)
+                self._last_action_result = {
+                    "action_type": execution_result.action_type,
+                    "tool_result": execution_result.tool_result,
+                }
+                write_debug_event(
+                    "action.executed",
+                    {
+                        "step": self._state.step_count,
+                        "action_type": execution_result.action_type,
+                        "tool_result": execution_result.tool_result,
+                        "affected_slide_index": execution_result.affected_slide_index,
+                    },
+                )
+                if execution_result.affected_slide_index is not None:
+                    inspection = self._inspection_service.inspect_presentation(
+                        self._editor
+                    )
+                    intermediate_result = self._score_intermediate_step(
+                        slide_index=execution_result.affected_slide_index,
+                        inspection=inspection,
+                    )
+                    reward = intermediate_result.reward_total
+                    self._last_reward_details = {
+                        "kind": "intermediate_slide",
+                        "result": to_serializable(intermediate_result),
+                    }
+                    write_debug_event(
+                        "reward.intermediate",
+                        {
+                            "step": self._state.step_count,
+                            "reward_result": to_serializable(intermediate_result),
+                        },
+                    )
+                else:
+                    reward = execution_result.reward
+                    self._last_reward_details = {
+                        "kind": "action",
+                        "result": {"reward_total": reward},
+                    }
+                    write_debug_event(
+                        "reward.action",
+                        {
+                            "step": self._state.step_count,
+                            "reward_total": reward,
+                        },
+                    )
+                logger.info(
+                    "env.step action complete episode_id=%s step=%s action_type=%s reward=%s tool_result=%s",
+                    self._state.episode_id,
+                    self._state.step_count,
+                    action.action_type,
+                    reward,
+                    execution_result.tool_result,
+                )
+            except (IndexError, KeyError, ValueError) as error:
+                invalid_reason = str(error)
+                reward = _INVALID_ACTION_PENALTY
+                self._last_action_result = None
+                self._last_reward_details = {
+                    "kind": "invalid_action",
+                    "result": {"reward_total": reward, "error": invalid_reason},
+                }
+                write_debug_event(
+                    "env.step.invalid_action",
+                    {
+                        "step": self._state.step_count,
+                        "action": action.model_dump(mode="json"),
+                        "error": invalid_reason,
+                        "reward_total": reward,
+                    },
+                )
+                logger.warning(
+                    "env.step invalid action episode_id=%s step=%s action_type=%s error=%s",
+                    self._state.episode_id,
+                    self._state.step_count,
+                    action.action_type,
+                    invalid_reason,
+                )
+
+            termination_reason = self._should_terminate()
+            reward = max(0.0, min(1.0, float(reward)))
+
+            if termination_reason is not None:
+                reward = self._finalize_episode(termination_reason)
+
+            logger.info(
+                "env.step end episode_id=%s step=%s done=%s reward=%s score=%s error=%s",
                 self._state.episode_id,
                 self._state.step_count,
-                action.action_type,
+                self._done,
+                reward,
+                self._last_score,
                 invalid_reason,
             )
+            write_debug_event(
+                "env.step.end",
+                {
+                    "step": self._state.step_count,
+                    "done": self._done,
+                    "reward": reward,
+                    "score": self._last_score,
+                    "error": invalid_reason,
+                    "termination_reason": self._termination_reason,
+                },
+            )
 
-        termination_reason = self._should_terminate()
-        reward = max(0.0, min(1.0, float(reward)))
-
-        if termination_reason is not None:
-            reward = self._finalize_episode(termination_reason)
-
-        logger.info(
-            "env.step end episode_id=%s step=%s done=%s reward=%s score=%s error=%s",
-            self._state.episode_id,
-            self._state.step_count,
-            self._done,
-            reward,
-            self._last_score,
-            invalid_reason,
-        )
-
-        return self._build_observation(
-            reward=reward,
-            done=self._done,
-            last_action_error=invalid_reason,
-            inspection=inspection,
-        )
+            return self._build_observation(
+                reward=reward,
+                done=self._done,
+                last_action_error=invalid_reason,
+                inspection=inspection,
+            )
 
     @property
     def state(self) -> State:
@@ -310,6 +396,14 @@ class PptAgentEnvironment(Environment):
         inspection = inspection or self._inspection_service.inspect_presentation(
             self._editor
         )
+        last_action_result = (
+            {
+                **self._last_action_result,
+                "reward_details": self._last_reward_details or {},
+            }
+            if self._last_action_result is not None
+            else None
+        )
         return PptAgentObservation(
             task_name=self._current_task_name(),
             difficulty=self._difficulty(),
@@ -319,7 +413,7 @@ class PptAgentEnvironment(Environment):
             last_action_error=last_action_error,
             score=self._last_score,
             prompt_summary=self._prompt_summary(),
-            last_action_result=self._last_action_result,
+            last_action_result=last_action_result,
             termination_reason=self._termination_reason,
             done=done,
             reward=reward,
@@ -379,7 +473,6 @@ class PptAgentEnvironment(Environment):
         payload = dict(action.payload)
         tool_result = create_slide(
             self._editor,
-            layout_index=int(payload.get("layout_index", 6)),
             background_color=payload.get("background_color", "<surface>"),
             shapes=payload.get("shapes") or [],
         )
@@ -493,6 +586,13 @@ class PptAgentEnvironment(Environment):
             "kind": "terminal_presentation",
             "result": to_serializable(result),
         }
+        write_debug_event(
+            "reward.terminal",
+            {
+                "termination_reason": termination_reason,
+                "reward_result": to_serializable(result),
+            },
+        )
         logger.info(
             "env.finalize complete episode_id=%s reward=%s metadata=%s",
             self._state.episode_id,

@@ -270,10 +270,8 @@ class PptxEditor:
                     color_hex=color_hex,
                 )
 
-    def add_slide(self, layout_index: int = 1) -> int:
-        layout_index = max(0, min(layout_index, len(self.prs.slide_layouts) - 1))
-        layout = self.prs.slide_layouts[layout_index]
-        self.prs.slides.add_slide(layout)
+    def add_slide(self) -> int:
+        self.prs.slides.add_slide(self.prs.slide_layouts[6])
         return len(self.prs.slides) - 1
 
     def reorder_slide(self, old_index: int, new_index: int):
@@ -296,29 +294,6 @@ class PptxEditor:
     def delete_slide_by_id(self, slide_id: int) -> int:
         slide_index = self.get_slide_index(slide_id)
         return self.delete_slide(slide_index)
-
-    def set_slide_layout(self, slide_index: int, layout_index: int):
-        self._validate_slide(slide_index)
-        if layout_index < 0 or layout_index >= len(self.prs.slide_layouts):
-            raise IndexError("Invalid layout index")
-        slide = self.prs.slides[slide_index]
-        new_layout = self.prs.slide_layouts[layout_index]
-
-        layout_rel = None
-        for rel in slide.part.rels.values():
-            if "slideLayout" in rel.reltype:
-                layout_rel = rel
-                break
-
-        if layout_rel:
-            slide.part.drop_rel(layout_rel.rId)
-
-        slide.part.relate_to(
-            new_layout.part,
-            "http://schemas.openxmlformats.org/officeDocument/2006/relationships/slideLayout",
-        )
-        if hasattr(slide, "_slide_layout"):
-            del slide._slide_layout
 
     def set_slide_background_by_id(
         self,
@@ -571,34 +546,6 @@ class PptxEditor:
         return self.add_image_by_id(
             self.get_slide_id(slide_index), image_path, x, y, cx=cx, cy=cy
         )
-
-    def add_citation_by_id(
-        self,
-        slide_id: int,
-        text: str,
-        style: Optional[Dict[str, Any]] = None,
-        *,
-        theme_name: Optional[str] = None,
-        bind_theme: bool = False,
-    ) -> int:
-        shape_id = self.add_textbox_by_id(slide_id, 0.5, 6.8, 9.0, 0.4)
-        self.insert_text_by_id(slide_id, shape_id, text)
-
-        citation_style = {"font_size_pt": 10, "italic": True}
-        if style:
-            citation_style.update(style)
-
-        self.style_text_by_id(
-            slide_id,
-            shape_id,
-            theme_name=theme_name,
-            bind_theme=bind_theme,
-            **citation_style,
-        )
-        return shape_id
-
-    def add_citation(self, slide_index: int, text: str):
-        return self.add_citation_by_id(self.get_slide_id(slide_index), text)
 
     def style_text_by_id(
         self,
@@ -937,7 +884,7 @@ class PptxEditor:
 
 if __name__ == "__main__":
     pptx_editor = PptxEditor()
-    slide_index = pptx_editor.add_slide(6)
+    slide_index = pptx_editor.add_slide()
     slide_id = pptx_editor.get_slide_id(slide_index)
     textbox_id = pptx_editor.add_textbox_by_id(slide_id, 0.5, 0.5, 9.0, 1.0)
     body_id = pptx_editor.add_textbox_by_id(slide_id, 0.5, 1.7, 9.0, 1.5)

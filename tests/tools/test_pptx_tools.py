@@ -12,7 +12,7 @@ def editor():
 
 
 def add_blank_slide(editor: PptxEditor) -> int:
-    return editor.add_slide(6)
+    return editor.add_slide()
 
 
 def add_textbox(editor: PptxEditor, slide_index: int, text: str = "sample") -> int:
@@ -22,12 +22,11 @@ def add_textbox(editor: PptxEditor, slide_index: int, text: str = "sample") -> i
     return len(slide.shapes) - 1
 
 
-def test_add_slide_clamps_invalid_layout_index(editor):
-    slide_index = editor.add_slide(999)
+def test_add_slide_creates_slide(editor):
+    slide_index = editor.add_slide()
 
     assert slide_index == 0
     assert len(editor.prs.slides) == 1
-    assert editor.prs.slides[0].slide_layout.name == editor.prs.slide_layouts[-1].name
 
 
 def test_validate_slide_raises_for_invalid_indexes(editor):
@@ -64,14 +63,6 @@ def test_reorder_slide_raises_for_invalid_new_index(editor):
 
     with pytest.raises(IndexError, match="new_index out of bounds"):
         editor.reorder_slide(0, 1)
-
-
-def test_insert_text_writes_existing_title_placeholder(editor):
-    slide_index = editor.add_slide(0)
-
-    editor.insert_text(slide_index, 0, "Quarterly Review")
-
-    assert editor.prs.slides[slide_index].shapes.title.text == "Quarterly Review"
 
 
 def test_insert_text_replaces_existing_text_in_textbox(editor):
@@ -280,17 +271,6 @@ def test_style_table_updates_existing_table(editor):
     assert table.cell(1, 1).text_frame.paragraphs[0].font.name == "Verdana"
     assert str(table.cell(0, 1).text_frame.paragraphs[0].font.color.rgb) == "FAFAFA"
     assert str(table.cell(1, 1).text_frame.paragraphs[0].font.color.rgb) == "1E293B"
-
-
-def test_add_citation_adds_small_italic_textbox(editor):
-    slide_index = add_blank_slide(editor)
-    slide = editor.prs.slides[slide_index]
-
-    editor.add_citation(slide_index, "Source: Example")
-
-    paragraph = slide.shapes[0].text_frame.paragraphs[0]
-    assert paragraph.text == "Source: Example"
-    assert paragraph.font.italic is True
 
 
 def test_style_update_applies_font_settings_to_existing_runs(editor):

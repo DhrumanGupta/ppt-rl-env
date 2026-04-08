@@ -57,6 +57,7 @@ class SlidesGenQuantitativeJudgeService:
             user_prompt,
             temperature=0.0,
             max_tokens=3000,
+            debug_stage="quantitative_quiz_judge",
         )
         answers = self._parse_answers(payload, questions)
         metadata = (

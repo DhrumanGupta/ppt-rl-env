@@ -21,6 +21,8 @@ class FakeLLMClient:
         user: str,
         temperature: float = 0.3,
         max_tokens: int = 1024,
+        *,
+        debug_stage: str | None = None,
     ) -> dict:
         self.calls.append(
             {
@@ -28,6 +30,7 @@ class FakeLLMClient:
                 "user": user,
                 "temperature": temperature,
                 "max_tokens": max_tokens,
+                "debug_stage": debug_stage,
             }
         )
         if not self._responses:
