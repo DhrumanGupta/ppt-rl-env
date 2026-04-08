@@ -100,7 +100,7 @@ SYSTEM_PROMPT = textwrap.dedent(
       - background -> use the schema field, not legacy DSL keys
       - type: title/body -> use type: text
       - font -> use style.font_name
-      - size -> use style.font_size_pt or theme size tokens
+      - size -> use numeric style.font_size_pt values
       - color -> use style.color_hex or other schema color fields
     - Use the provided tools directly. Do not emit plans, explanations, or pseudo-actions.
 
@@ -124,9 +124,8 @@ SYSTEM_PROMPT = textwrap.dedent(
 
     Theme token rules:
     - You may use these theme tokens inside payload values:
-      - <bg>, <surface>, <accent>, <primary>, <secondary>
-      - <font>, <title_size>, <body_size>, <caption_size>
-    - Prefer theme tokens over hardcoded repeated style values for consistent design.
+      - <bg>, <surface>, <accent>, <primary>, <secondary>, <font>
+    - Prefer theme tokens over hardcoded repeated color and font values for consistent design.
     - Use set_theme to update or add more theme tokens in the theme
     - Omitted theme keys remain unchanged.
 
@@ -150,7 +149,7 @@ SYSTEM_PROMPT = textwrap.dedent(
           "h": 0.8,
           "style": {
             "font_name": "<font>",
-            "font_size_pt": "<title_size>",
+            "font_size_pt": 28,
             "color_hex": "<primary>",
             "bold": true,
             "word_wrap": true,
@@ -167,7 +166,7 @@ SYSTEM_PROMPT = textwrap.dedent(
           "h": 0.9,
           "style": {
             "font_name": "<font>",
-            "font_size_pt": "<body_size>",
+            "font_size_pt": 16,
             "color_hex": "<secondary>",
             "word_wrap": true,
             "line_spacing": 1.15
@@ -186,7 +185,7 @@ SYSTEM_PROMPT = textwrap.dedent(
           "text": "Harbor Retail Expansion 2026",
           "style": {
             "font_name": "<font>",
-            "font_size_pt": "<title_size>",
+            "font_size_pt": 28,
             "color_hex": "<primary>",
             "bold": true
           }

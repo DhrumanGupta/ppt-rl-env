@@ -18,7 +18,7 @@ class _StrictModel(BaseModel):
 
 class TextStyleArgs(_StrictModel):
     font_name: str = ""
-    font_size_pt: str = ""
+    font_size_pt: float | None = None
     bold: bool | None = None
     italic: bool | None = None
     color_hex: str = ""
@@ -31,17 +31,17 @@ class TextStyleArgs(_StrictModel):
 class ChartStyleArgs(_StrictModel):
     title: str = ""
     title_font_name: str = ""
-    title_font_size_pt: str = ""
+    title_font_size_pt: float | None = None
     title_bold: bool | None = None
     title_italic: bool | None = None
     title_color_hex: str = ""
     legend_font_name: str = ""
-    legend_font_size_pt: str = ""
+    legend_font_size_pt: float | None = None
     legend_bold: bool | None = None
     legend_italic: bool | None = None
     legend_color_hex: str = ""
     axis_font_name: str = ""
-    axis_font_size_pt: str = ""
+    axis_font_size_pt: float | None = None
     axis_bold: bool | None = None
     axis_italic: bool | None = None
     axis_color_hex: str = ""
@@ -53,8 +53,8 @@ class TableStyleArgs(_StrictModel):
     body_fill_hex: str = ""
     header_font_name: str = ""
     body_font_name: str = ""
-    header_font_size_pt: str = ""
-    body_font_size_pt: str = ""
+    header_font_size_pt: float | None = None
+    body_font_size_pt: float | None = None
     header_bold: bool | None = None
     body_bold: bool | None = None
     header_italic: bool | None = None
@@ -332,6 +332,105 @@ _SHAPE_FIELD_ALIASES = {
     "hex": "color_hex",
 }
 
+_ROOT_FLOAT_FIELDS = {
+    "x",
+    "y",
+    "w",
+    "h",
+    "height",
+    "title_size",
+    "body_size",
+    "caption_size",
+}
+
+_STYLE_KEYS_BY_SHAPE_TYPE = {
+    "text": {
+        "font_name",
+        "font_size_pt",
+        "bold",
+        "italic",
+        "color_hex",
+        "word_wrap",
+        "space_before_pt",
+        "space_after_pt",
+        "line_spacing",
+    },
+    "chart": {
+        "title",
+        "title_font_name",
+        "title_font_size_pt",
+        "title_bold",
+        "title_italic",
+        "title_color_hex",
+        "legend_font_name",
+        "legend_font_size_pt",
+        "legend_bold",
+        "legend_italic",
+        "legend_color_hex",
+        "axis_font_name",
+        "axis_font_size_pt",
+        "axis_bold",
+        "axis_italic",
+        "axis_color_hex",
+        "series_colors",
+    },
+    "table": {
+        "header_fill_hex",
+        "body_fill_hex",
+        "header_font_name",
+        "body_font_name",
+        "header_font_size_pt",
+        "body_font_size_pt",
+        "header_bold",
+        "body_bold",
+        "header_italic",
+        "body_italic",
+        "header_font_color_hex",
+        "body_font_color_hex",
+    },
+}
+
+_STYLE_FLOAT_FIELDS = {
+    "font_size_pt",
+    "space_before_pt",
+    "space_after_pt",
+    "line_spacing",
+    "title_font_size_pt",
+    "legend_font_size_pt",
+    "axis_font_size_pt",
+    "header_font_size_pt",
+    "body_font_size_pt",
+}
+
+_SHAPE_ALLOWED_KEYS = {
+    "accent_bar": {
+        "type",
+        "shape_id",
+        "name",
+        "color_hex",
+        "height",
+        "x",
+        "y",
+        "w",
+        "h",
+    },
+    "text": {"type", "shape_id", "name", "text", "x", "y", "w", "h", "style"},
+    "chart": {
+        "type",
+        "shape_id",
+        "name",
+        "chart_type",
+        "chart_data",
+        "x",
+        "y",
+        "w",
+        "h",
+        "style",
+    },
+    "table": {"type", "shape_id", "name", "table_data", "x", "y", "w", "h", "style"},
+    "image": {"type", "shape_id", "name", "image_path", "x", "y", "w", "h"},
+}
+
 
 @dataclass(frozen=True, slots=True)
 class AgentToolInvocation:
@@ -346,10 +445,11 @@ class AgentToolInvocation:
 
     @property
     def arguments(self) -> dict[str, Any]:
-        return self.arguments_model.model_dump(
-            exclude_none=True,
-            exclude_unset=True,
-            exclude_defaults=True,
+        return _normalize_tool_arguments(
+            self.arguments_model.model_dump(
+                exclude_none=True,
+                exclude_unset=True,
+            )
         )
 
 
@@ -400,18 +500,92 @@ def _validate_tool_arguments(tool_name: str, arguments: dict[str, Any]) -> None:
         return
 
 
-def _canonicalize_shape(shape: Any) -> Any:
+def _coerce_float(value: Any) -> Any:
+    if isinstance(value, str):
+        stripped = value.strip()
+        if not stripped:
+            return value
+        try:
+            return float(stripped)
+        except ValueError:
+            return value
+    return value
+
+
+def _normalize_style(shape_type: str, style: Any) -> dict[str, Any]:
+    if not isinstance(style, dict):
+        return {}
+
+    allowed_keys = _STYLE_KEYS_BY_SHAPE_TYPE.get(shape_type)
+    if allowed_keys is None:
+        return {}
+
+    normalized_style: dict[str, Any] = {}
+    for key, value in style.items():
+        if key not in allowed_keys:
+            continue
+        normalized_style[key] = (
+            _coerce_float(value) if key in _STYLE_FLOAT_FIELDS else value
+        )
+    return normalized_style
+
+
+def _normalize_shape(shape: Any) -> Any:
     if not isinstance(shape, dict):
         return shape
 
-    canonical_shape: dict[str, Any] = {}
-    for key, value in shape.items():
-        canonical_key = _SHAPE_FIELD_ALIASES.get(key, key)
-        if canonical_key == "style" and isinstance(value, dict):
-            canonical_shape[canonical_key] = dict(value)
+    canonical_shape = {
+        _SHAPE_FIELD_ALIASES.get(key, key): value for key, value in shape.items()
+    }
+    shape_type = canonical_shape.get("type")
+    if not isinstance(shape_type, str):
+        return canonical_shape
+
+    normalized_shape: dict[str, Any] = {}
+    allowed_keys = _SHAPE_ALLOWED_KEYS.get(shape_type)
+    if allowed_keys is None:
+        return canonical_shape
+
+    raw_style = canonical_shape.get("style")
+    style_payload = raw_style if isinstance(raw_style, dict) else {}
+
+    if shape_type == "accent_bar" and "color_hex" not in canonical_shape:
+        if (
+            isinstance(style_payload.get("color_hex"), str)
+            and style_payload["color_hex"]
+        ):
+            canonical_shape["color_hex"] = style_payload["color_hex"]
+
+    for key, value in canonical_shape.items():
+        if key == "style":
             continue
-        canonical_shape[canonical_key] = value
-    return canonical_shape
+        if key in _STYLE_KEYS_BY_SHAPE_TYPE.get(shape_type, set()):
+            style_payload.setdefault(key, value)
+            continue
+        if key not in allowed_keys:
+            continue
+        normalized_shape[key] = (
+            _coerce_float(value) if key in _ROOT_FLOAT_FIELDS else value
+        )
+
+    normalized_style = _normalize_style(shape_type, style_payload)
+    if normalized_style and "style" in allowed_keys:
+        normalized_shape["style"] = normalized_style
+
+    return normalized_shape
+
+
+def _normalize_tool_arguments(arguments: dict[str, Any]) -> dict[str, Any]:
+    normalized_arguments: dict[str, Any] = {}
+    for key, value in arguments.items():
+        if key in _ROOT_FLOAT_FIELDS:
+            normalized_arguments[key] = _coerce_float(value)
+            continue
+        if key in {"shapes", "add_shapes", "update_shapes"} and isinstance(value, list):
+            normalized_arguments[key] = [_normalize_shape(shape) for shape in value]
+            continue
+        normalized_arguments[key] = value
+    return normalized_arguments
 
 
 def _canonicalize_tool_arguments(
@@ -426,12 +600,12 @@ def _canonicalize_tool_arguments(
             value, list
         ):
             canonical_arguments[canonical_key] = [
-                _canonicalize_shape(shape) for shape in value
+                _normalize_shape(shape) for shape in value
             ]
             continue
         canonical_arguments[canonical_key] = value
 
-    return canonical_arguments
+    return _normalize_tool_arguments(canonical_arguments)
 
 
 def build_openai_tools() -> list[dict[str, Any]]:
@@ -468,10 +642,11 @@ def parse_tool_invocation(
     arguments_model = model.model_validate(
         _canonicalize_tool_arguments(tool_name, raw_arguments)
     )
-    compact_arguments = arguments_model.model_dump(
-        exclude_none=True,
-        exclude_unset=True,
-        exclude_defaults=True,
+    compact_arguments = _normalize_tool_arguments(
+        arguments_model.model_dump(
+            exclude_none=True,
+            exclude_unset=True,
+        )
     )
     _validate_tool_arguments(tool_name, compact_arguments)
 
