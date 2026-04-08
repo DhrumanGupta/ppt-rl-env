@@ -56,7 +56,7 @@ app = create_app(
 
 
 @app.on_event("startup")
-async def preload_models() -> None:
+def preload_models() -> None:
     preload_similarity_model()
 
 
