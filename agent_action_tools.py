@@ -186,6 +186,152 @@ _TOOL_DESCRIPTIONS = {
     "set_theme": "Set default theme tokens.",
 }
 
+_STYLE_SCHEMA = {
+    "type": "object",
+    "additionalProperties": False,
+    "properties": {
+        "font_name": {"type": "string"},
+        "font_size_pt": {"type": "number"},
+        "bold": {"type": "boolean"},
+        "italic": {"type": "boolean"},
+        "color_hex": {"type": "string"},
+        "word_wrap": {"type": "boolean"},
+        "space_before_pt": {"type": "number"},
+        "space_after_pt": {"type": "number"},
+        "line_spacing": {"type": "number"},
+        "title": {"type": "string"},
+        "title_font_name": {"type": "string"},
+        "title_font_size_pt": {"type": "number"},
+        "title_bold": {"type": "boolean"},
+        "title_italic": {"type": "boolean"},
+        "title_color_hex": {"type": "string"},
+        "legend_font_name": {"type": "string"},
+        "legend_font_size_pt": {"type": "number"},
+        "legend_bold": {"type": "boolean"},
+        "legend_italic": {"type": "boolean"},
+        "legend_color_hex": {"type": "string"},
+        "axis_font_name": {"type": "string"},
+        "axis_font_size_pt": {"type": "number"},
+        "axis_bold": {"type": "boolean"},
+        "axis_italic": {"type": "boolean"},
+        "axis_color_hex": {"type": "string"},
+        "series_colors": {"type": "array", "items": {"type": "string"}},
+        "header_fill_hex": {"type": "string"},
+        "body_fill_hex": {"type": "string"},
+        "header_font_name": {"type": "string"},
+        "body_font_name": {"type": "string"},
+        "header_font_size_pt": {"type": "number"},
+        "body_font_size_pt": {"type": "number"},
+        "header_bold": {"type": "boolean"},
+        "body_bold": {"type": "boolean"},
+        "header_italic": {"type": "boolean"},
+        "body_italic": {"type": "boolean"},
+        "header_font_color_hex": {"type": "string"},
+        "body_font_color_hex": {"type": "string"},
+    },
+}
+
+_SHAPE_SCHEMA = {
+    "type": "object",
+    "additionalProperties": False,
+    "properties": {
+        "type": {
+            "type": "string",
+            "enum": ["accent_bar", "text", "chart", "table", "image"],
+        },
+        "id": {"type": "integer"},
+        "name": {"type": "string"},
+        "text": {"type": "string"},
+        "ct": {"type": "string"},
+        "cd": {"type": "object", "additionalProperties": True},
+        "td": {
+            "type": "array",
+            "items": {"type": "array", "items": {"type": "string"}},
+        },
+        "img": {"type": "string"},
+        "hex": {"type": "string"},
+        "height": {"type": "number"},
+        "x": {"type": "number"},
+        "y": {"type": "number"},
+        "w": {"type": "number"},
+        "h": {"type": "number"},
+        "style": _STYLE_SCHEMA,
+    },
+    "required": ["type"],
+}
+
+_COMPACT_TOOL_PARAMETERS = {
+    "create_slide": {
+        "type": "object",
+        "additionalProperties": False,
+        "properties": {
+            "bg": {"type": "string"},
+            "shapes": {"type": "array", "items": _SHAPE_SCHEMA},
+        },
+    },
+    "update_slide": {
+        "type": "object",
+        "additionalProperties": False,
+        "properties": {
+            "si": {"type": "integer", "minimum": 1},
+            "bg": {"type": "string"},
+            "del": {"type": "array", "items": {"type": "integer"}},
+            "add": {"type": "array", "items": _SHAPE_SCHEMA},
+            "upd": {"type": "array", "items": _SHAPE_SCHEMA},
+        },
+        "required": ["si"],
+    },
+    "delete_slide": {
+        "type": "object",
+        "additionalProperties": False,
+        "properties": {"si": {"type": "integer", "minimum": 1}},
+        "required": ["si"],
+    },
+    "save_presentation": {
+        "type": "object",
+        "additionalProperties": False,
+        "properties": {"path": {"type": "string"}},
+    },
+    "set_theme": {
+        "type": "object",
+        "additionalProperties": False,
+        "properties": {
+            "bg": {"type": "string"},
+            "surface": {"type": "string"},
+            "accent": {"type": "string"},
+            "primary": {"type": "string"},
+            "secondary": {"type": "string"},
+            "font": {"type": "string"},
+            "ts": {"type": "number"},
+            "bs": {"type": "number"},
+            "cs": {"type": "number"},
+        },
+    },
+}
+
+_TOOL_FIELD_ALIASES = {
+    "create_slide": {"bg": "background_color"},
+    "update_slide": {
+        "si": "slide_index",
+        "bg": "background_color",
+        "del": "delete_shape_ids",
+        "add": "add_shapes",
+        "upd": "update_shapes",
+    },
+    "delete_slide": {"si": "slide_index"},
+    "save_presentation": {},
+    "set_theme": {"ts": "title_size", "bs": "body_size", "cs": "caption_size"},
+}
+
+_SHAPE_FIELD_ALIASES = {
+    "id": "shape_id",
+    "ct": "chart_type",
+    "cd": "chart_data",
+    "td": "table_data",
+    "img": "image_path",
+    "hex": "color_hex",
+}
+
 
 @dataclass(frozen=True, slots=True)
 class AgentToolInvocation:
@@ -254,6 +400,40 @@ def _validate_tool_arguments(tool_name: str, arguments: dict[str, Any]) -> None:
         return
 
 
+def _canonicalize_shape(shape: Any) -> Any:
+    if not isinstance(shape, dict):
+        return shape
+
+    canonical_shape: dict[str, Any] = {}
+    for key, value in shape.items():
+        canonical_key = _SHAPE_FIELD_ALIASES.get(key, key)
+        if canonical_key == "style" and isinstance(value, dict):
+            canonical_shape[canonical_key] = dict(value)
+            continue
+        canonical_shape[canonical_key] = value
+    return canonical_shape
+
+
+def _canonicalize_tool_arguments(
+    tool_name: str, arguments: dict[str, Any]
+) -> dict[str, Any]:
+    aliases = _TOOL_FIELD_ALIASES[tool_name]
+    canonical_arguments: dict[str, Any] = {}
+
+    for key, value in arguments.items():
+        canonical_key = aliases.get(key, key)
+        if canonical_key in {"shapes", "add_shapes", "update_shapes"} and isinstance(
+            value, list
+        ):
+            canonical_arguments[canonical_key] = [
+                _canonicalize_shape(shape) for shape in value
+            ]
+            continue
+        canonical_arguments[canonical_key] = value
+
+    return canonical_arguments
+
+
 def build_openai_tools() -> list[dict[str, Any]]:
     return [
         {
@@ -261,10 +441,10 @@ def build_openai_tools() -> list[dict[str, Any]]:
             "function": {
                 "name": tool_name,
                 "description": _TOOL_DESCRIPTIONS[tool_name],
-                "parameters": model.model_json_schema(),
+                "parameters": _COMPACT_TOOL_PARAMETERS[tool_name],
             },
         }
-        for tool_name, model in _TOOL_MODELS.items()
+        for tool_name in _TOOL_MODELS
     ]
 
 
@@ -285,7 +465,9 @@ def parse_tool_invocation(
     if not isinstance(raw_arguments, dict):
         raise ValueError("Tool arguments must decode to a JSON object")
 
-    arguments_model = model.model_validate(raw_arguments)
+    arguments_model = model.model_validate(
+        _canonicalize_tool_arguments(tool_name, raw_arguments)
+    )
     compact_arguments = arguments_model.model_dump(
         exclude_none=True,
         exclude_unset=True,

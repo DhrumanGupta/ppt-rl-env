@@ -3,7 +3,11 @@ from types import SimpleNamespace
 
 import pytest
 
-from agent_action_tools import parse_tool_invocation, tool_invocation_to_action
+from agent_action_tools import (
+    build_openai_tools,
+    parse_tool_invocation,
+    tool_invocation_to_action,
+)
 from inference import (
     SYSTEM_PROMPT,
     _planning_payload,
@@ -93,6 +97,52 @@ def test_parse_tool_invocation_rejects_invalid_text_style_alias_keys():
                 ]
             },
         )
+
+
+def test_parse_tool_invocation_accepts_compact_alias_fields():
+    invocation = parse_tool_invocation(
+        "update_slide",
+        {
+            "si": 2,
+            "bg": "<surface>",
+            "add": [
+                {
+                    "type": "chart",
+                    "name": "revenue_chart",
+                    "ct": "bar_clustered",
+                    "cd": {"categories": ["Q1", "Q2"], "series": []},
+                    "x": 0.7,
+                    "y": 1.4,
+                    "w": 5.4,
+                    "h": 3.0,
+                }
+            ],
+            "upd": [{"type": "text", "id": 11, "text": "Updated title"}],
+            "del": [12],
+        },
+    )
+
+    action = tool_invocation_to_action(invocation, default_save_path="outputs/out.pptx")
+
+    assert action.action_type == "update_slide"
+    assert action.slide_index == 2
+    assert action.payload == {
+        "background_color": "<surface>",
+        "delete_shape_ids": [12],
+        "add_shapes": [
+            {
+                "type": "chart",
+                "name": "revenue_chart",
+                "chart_type": "bar_clustered",
+                "chart_data": {"categories": ["Q1", "Q2"], "series": []},
+                "x": 0.7,
+                "y": 1.4,
+                "w": 5.4,
+                "h": 3.0,
+            }
+        ],
+        "update_shapes": [{"type": "text", "shape_id": 11, "text": "Updated title"}],
+    }
 
 
 def test_validate_tool_choice_blocks_early_save():
@@ -198,11 +248,24 @@ def test_planning_payload_uses_observation_planning_metadata():
 
 
 def test_system_prompt_warns_against_old_macro_dsl_fields():
-    assert "background -> use background_color" in SYSTEM_PROMPT
+    assert "background -> use the schema field, not legacy DSL keys" in SYSTEM_PROMPT
     assert "type: title/body -> use type: text" in SYSTEM_PROMPT
     assert '"font_size_pt"' in SYSTEM_PROMPT
-    assert '"color_hex"' in SYSTEM_PROMPT
     assert "set_theme" in SYSTEM_PROMPT
+
+
+def test_build_openai_tools_exposes_compact_tool_schema():
+    tools = {
+        tool["function"]["name"]: tool["function"] for tool in build_openai_tools()
+    }
+
+    create_slide = tools["create_slide"]
+    update_slide = tools["update_slide"]
+
+    assert "title" not in create_slide["parameters"]
+    assert "default" not in json.dumps(create_slide["parameters"])
+    assert create_slide["parameters"]["properties"]["bg"]["type"] == "string"
+    assert update_slide["parameters"]["required"] == ["si"]
 
 
 def test_choose_action_uses_tool_call_and_returns_agent_action():

@@ -3,7 +3,7 @@
     {
       "task_id": "northstar_growth_easy",
       "difficulty": "easy",
-      "prompt_text": "Create a factual two-slide presentation for a professional audience about Harbor Retail Expansion 2026. Slide 1 should introduce the initiative, the operating focus, and why management launched it. Slide 2 should summarize the measurable business results, including same-store sales growth from 4.2% to 6.1% and delivery complaints reduced by 22%, with a source citation.",
+      "prompt_text": "Create a factual two-slide presentation for a professional audience about Harbor Retail Expansion 2026. Slide 1 should introduce the initiative, the operating focus, and why management launched it. Slide 2 should summarize the measurable business results, including same-store sales growth from 4.2% to 6.1% and delivery complaints reduced by 22%.",
       "task_constraints": {
         "min_slides": 2,
         "max_slides": 2,
@@ -47,7 +47,7 @@
     {
       "task_id": "lattice_health_easy",
       "difficulty": "easy",
-      "prompt_text": "Create a factual three-slide presentation for a healthcare operations audience about Lattice Health Intake Redesign. Slide 1 should introduce the redesign program and its operational goal. Slide 2 should explain the workflow changes, including nurse triage routing and digital pre-visit forms. Slide 3 should summarize the measurable outcomes, including intake time reduced from 19 minutes to 11 minutes and no-show rate improved from 14% to 9%, with a source citation.",
+      "prompt_text": "Create a factual three-slide presentation for a healthcare operations audience about Lattice Health Intake Redesign. Slide 1 should introduce the redesign program and its operational goal. Slide 2 should explain the workflow changes, including nurse triage routing and digital pre-visit forms. Slide 3 should summarize the measurable outcomes, including intake time reduced from 19 minutes to 11 minutes and no-show rate improved from 14% to 9%.",
       "task_constraints": {
         "min_slides": 3,
         "max_slides": 3,
@@ -91,7 +91,7 @@
     {
       "task_id": "northstar_growth_medium",
       "difficulty": "medium",
-      "prompt_text": "Create a factual four-slide presentation for a professional audience about Northstar Growth Plan 2026. Slide 1 should introduce the plan and its business objective. Slide 2 should explain the retention improvement from 88% to 93% and why it matters commercially. Slide 3 should explain how guided automation reduced onboarding time by 35%, with a source citation. Slide 4 should show a revenue chart with quarterly target values 18, 24, 28, and 32.",
+      "prompt_text": "Create a factual four-slide presentation for a professional audience about Northstar Growth Plan 2026. Slide 1 should introduce the plan and its business objective. Slide 2 should explain the retention improvement from 88% to 93% and why it matters commercially. Slide 3 should explain how guided automation reduced onboarding time by 35%. Slide 4 should show a revenue chart with quarterly target values 18, 24, 28, and 32.",
       "task_constraints": {
         "min_slides": 4,
         "max_slides": 4,
@@ -135,7 +135,7 @@
     {
       "task_id": "solstice_logistics_medium",
       "difficulty": "medium",
-      "prompt_text": "Create a factual four-slide presentation for an operations leadership audience about Solstice Logistics Network Reset. Slide 1 should introduce the network reset and its objective. Slide 2 should explain the route and hub changes implemented. Slide 3 should summarize the measurable results, including on-time delivery improved from 91% to 96% and line-haul cost per package fell by 13%, with a source citation. Slide 4 should show a chart of quarterly package volume targets with values 52, 56, 61, and 68.",
+      "prompt_text": "Create a factual four-slide presentation for an operations leadership audience about Solstice Logistics Network Reset. Slide 1 should introduce the network reset and its objective. Slide 2 should explain the route and hub changes implemented. Slide 3 should summarize the measurable results, including on-time delivery improved from 91% to 96% and line-haul cost per package fell by 13%. Slide 4 should show a chart of quarterly package volume targets with values 52, 56, 61, and 68.",
       "task_constraints": {
         "min_slides": 4,
         "max_slides": 4,
@@ -144,7 +144,7 @@
         "extra_constraints": {}
       },
       "source_pack": {
-        "brief": "The packet includes network design actions, operating logic, and results. Keep route and hub changes together, and reserve the KPI slide for quantified outcomes with attribution.",
+        "brief": "The packet includes network design actions, operating logic, and results. Keep route and hub changes together, and reserve the KPI slide for quantified outcomes.",
         "documents": [
           {
             "doc_id": "network_brief",
@@ -180,7 +180,7 @@
     {
       "task_id": "northstar_growth_hard",
       "difficulty": "hard",
-      "prompt_text": "Create a factual five-slide presentation for an executive audience about Aurora Cloud Efficiency Program. Slide 1 should introduce the program and the strategic objective. Slide 2 should summarize the operating context and why efficiency matters for enterprise growth. Slide 3 should present the result that gross margin increased from 61% to 67%. Slide 4 should present the result that incident resolution time dropped by 41%, with a source citation. Slide 5 should show a revenue chart with quarterly target values 42, 48, 57, and 63.",
+      "prompt_text": "Create a factual five-slide presentation for an executive audience about Aurora Cloud Efficiency Program. Slide 1 should introduce the program and the strategic objective. Slide 2 should summarize the operating context and why efficiency matters for enterprise growth. Slide 3 should present the result that gross margin increased from 61% to 67%. Slide 4 should present the result that incident resolution time dropped by 41%. Slide 5 should show a revenue chart with quarterly target values 42, 48, 57, and 63.",
       "task_constraints": {
         "min_slides": 5,
         "max_slides": 5,
@@ -225,7 +225,7 @@
     {
       "task_id": "quarry_energy_hard",
       "difficulty": "hard",
-      "prompt_text": "Create a factual five-slide presentation for a board-level audience about Quarry Energy Capital Discipline Program. Slide 1 should introduce the program and the board concern it addresses. Slide 2 should summarize the spending controls and portfolio actions implemented. Slide 3 should explain the result that free cash flow margin increased from 9% to 15%. Slide 4 should explain the result that unplanned maintenance downtime fell by 28%, with a source citation. Slide 5 should show a capital deployment chart with quarterly values 110, 95, 88, and 92.",
+      "prompt_text": "Create a factual five-slide presentation for a board-level audience about Quarry Energy Capital Discipline Program. Slide 1 should introduce the program and the board concern it addresses. Slide 2 should summarize the spending controls and portfolio actions implemented. Slide 3 should explain the result that free cash flow margin increased from 9% to 15%. Slide 4 should explain the result that unplanned maintenance downtime fell by 28%. Slide 5 should show a capital deployment chart with quarterly values 110, 95, 88, and 92.",
       "task_constraints": {
         "min_slides": 5,
         "max_slides": 5,

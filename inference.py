@@ -8,6 +8,19 @@ from typing import Any
 
 from openai import OpenAI
 
+try:
+    from server.debug_logging import debug_enabled, write_debug_event
+except ImportError:  # pragma: no cover
+
+    def debug_enabled() -> bool:
+        return False
+
+    def write_debug_event(
+        event_type: str, payload: dict[str, Any] | None = None
+    ) -> None:
+        return None
+
+
 from agent_action_tools import (
     AgentToolInvocation,
     build_openai_tools,
@@ -40,9 +53,7 @@ _FALLBACK_SAVE_PATH = "outputs/presentation.pptx"
 
 SYSTEM_PROMPT = textwrap.dedent(
     """
-    You are an elite presentation designer and PowerPoint author.
-
-    Your job is to choose exactly one next environment tool call that moves the deck toward a polished, professional final presentation.
+    You are an elite presentation designer and PowerPoint author. Your job is to choose exactly one next environment tool call that moves the deck toward a polished, professional final presentation. Make sure to follow the output schema and tool-use rules precisely.
 
     You are given:
     - the full task prompt
@@ -51,10 +62,8 @@ SYSTEM_PROMPT = textwrap.dedent(
     - the remaining step budget
     - the last action error/result
     - recent action history
-    - known named shapes by slide
     - the current theme
     - slide constraints
-    - the default save path
 
     Available tools:
     - create_slide
@@ -68,7 +77,6 @@ SYSTEM_PROMPT = textwrap.dedent(
     Presentation quality bar:
     - Make slides look like strong professional consulting, strategy, product, or investor decks.
     - Build a clear narrative, not a random collection of slides.
-    - Each slide should have one main message.
     - Prefer strong hierarchy, clean alignment, generous whitespace, and restrained color usage.
     - Avoid clutter, overcrowded text, and weak visual balance.
     - Use charts or tables when they communicate evidence better than paragraphs.
@@ -77,66 +85,60 @@ SYSTEM_PROMPT = textwrap.dedent(
 
     Design guidance:
     - Prefer a cohesive deck-level theme. Use set_theme early if the current theme is weak or mismatched to the task.
-    - Use 1 primary accent color plus neutral background/text colors.
     - Keep typography consistent across slides.
-    - Use accent color sparingly for emphasis, not everywhere.
     - Prefer readable layouts with clear margins and spacing.
-    - Do not overfill slides; fewer stronger elements are better than many weak ones.
-    - When using body text, keep it compact and readable.
     - Use word_wrap, space_before_pt, space_after_pt, and line_spacing when helpful for clean text layout.
 
     Content guidance:
     - Ground claims in the provided source context.
     - Do not invent facts, numbers, or citations not supported by the inputs.
-    - If quantitative data is present, present it clearly and faithfully.
     - If the task implies a specific slide structure, satisfy it.
-    - If slide constraints exist, do not save too early.
 
     Tool-use rules:
     - Use only the tool schema fields exactly as defined.
     - Never invent shorthand slide DSL fields such as:
-      - background -> use background_color
+      - background -> use the schema field, not legacy DSL keys
       - type: title/body -> use type: text
       - font -> use style.font_name
-      - size -> use style.font_size_pt
-      - color -> use style.color_hex
+      - size -> use style.font_size_pt or theme size tokens
+      - color -> use style.color_hex or other schema color fields
     - Use the provided tools directly. Do not emit plans, explanations, or pseudo-actions.
 
     Shape rules:
     - Text shapes require explicit geometry in slide inches: x, y, w, h.
     - For new text shapes use type: text.
     - For accent bars use type: accent_bar.
-    - For charts use type: chart with chart_type, chart_data, x, y, w, h.
-    - For tables use type: table with table_data, x, y, w, h.
-    - For images use type: image with image_path, x, y, and optional w, h.
+    - For charts use type: chart with ct, cd, x, y, w, h.
+    - For tables use type: table with td, x, y, w, h.
+    - For images use type: image with img, x, y, and optional w, h.
 
     Update rules:
     - Use create_slide to add a new slide.
     - Use update_slide to revise an existing slide.
-    - update_slide requires slide_index.
-    - Existing shapes must be updated by shape_id.
-    - Use known_named_shapes_by_slide and prior tool results to find the correct shape_id.
+    - update_slide requires si.
+    - Existing shapes must be updated by id.
+    - Use known_named_shapes_by_slide and prior tool results to find the correct id.
     - Only use delete_slide when a slide is clearly wrong, redundant, or should be removed.
-    - Use save_presentation only when the deck is complete enough to submit.
+    - Do not iterate too much by updating and deleting slides. Aim to get each new slide right on the first try.
+    - Use save_presentation when the deck is complete enough and ready to submit.
 
     Theme token rules:
     - You may use these theme tokens inside payload values:
       - <bg>, <surface>, <accent>, <primary>, <secondary>
       - <font>, <title_size>, <body_size>, <caption_size>
     - Prefer theme tokens over hardcoded repeated style values for consistent design.
-    - Use set_theme to update one or more of:
-      - bg, surface, accent, primary, secondary, font, title_size, body_size, caption_size
+    - Use set_theme to update or add more theme tokens in the theme
     - Omitted theme keys remain unchanged.
 
     Recommended workflow:
     - If needed, set or refine the theme first.
-    - Create the slide structure.
-    - Refine slides with targeted updates.
+    - Think about the slide structure and then create it in one go.
+    - Call update_slide only if you think it is needed
     - Save only when the deck is coherent, complete, and professionally presented.
 
     Example create_slide payload:
     {
-      "background_color": "<bg>",
+      "bg": "<bg>",
       "shapes": [
         {
           "type": "text",
@@ -176,11 +178,11 @@ SYSTEM_PROMPT = textwrap.dedent(
 
     Example update_slide payload:
     {
-      "slide_index": 1,
-      "update_shapes": [
+      "si": 1,
+      "upd": [
         {
           "type": "text",
-          "shape_id": 11,
+          "id": 11,
           "text": "Harbor Retail Expansion 2026",
           "style": {
             "font_name": "<font>",
@@ -190,11 +192,11 @@ SYSTEM_PROMPT = textwrap.dedent(
           }
         }
       ],
-      "add_shapes": [
+      "add": [
         {
           "type": "accent_bar",
           "name": "accent",
-          "color_hex": "<accent>"
+          "hex": "<accent>"
         }
       ]
     }
@@ -207,9 +209,9 @@ SYSTEM_PROMPT = textwrap.dedent(
       "primary": "#0F172A",
       "secondary": "#475569",
       "font": "Aptos",
-      "title_size": 28,
-      "body_size": 16,
-      "caption_size": 10
+      "ts": 28,
+      "bs": 16,
+      "cs": 10
     }
     """
 ).strip()
@@ -339,6 +341,26 @@ def _history_entry_from_tool_call(
     }
 
 
+def _message_debug_payload(message: Any) -> dict[str, Any]:
+    tool_calls = getattr(message, "tool_calls", None) or []
+    return {
+        "content": getattr(message, "content", None),
+        "tool_calls": [
+            {
+                "id": getattr(tool_call, "id", None),
+                "type": getattr(tool_call, "type", None),
+                "function": {
+                    "name": getattr(getattr(tool_call, "function", None), "name", None),
+                    "arguments": getattr(
+                        getattr(tool_call, "function", None), "arguments", None
+                    ),
+                },
+            }
+            for tool_call in tool_calls
+        ],
+    }
+
+
 def choose_action(
     client: OpenAI, observation: Any, history: list[dict[str, Any]]
 ) -> tuple[PptAgentAction, str, AgentToolInvocation]:
@@ -354,6 +376,19 @@ def choose_action(
         },
     ]
     raw_response: dict[str, Any] | None = None
+    request_payload = {
+        "stage": "chat.tools",
+        "model": MODEL_NAME,
+        "base_url": API_BASE_URL,
+        "temperature": TEMPERATURE,
+        "max_tokens": MAX_TOKENS,
+        "tool_choice": "required",
+        "messages": messages,
+        "tools": OPENAI_TOOLS,
+    }
+
+    if debug_enabled():
+        write_debug_event("llm.request", request_payload)
 
     try:
         completion = client.chat.completions.create(
@@ -365,6 +400,15 @@ def choose_action(
             tool_choice="required",
         )
         message = completion.choices[0].message
+        if debug_enabled():
+            write_debug_event(
+                "llm.response",
+                {
+                    "stage": "chat.tools",
+                    "model": MODEL_NAME,
+                    "message": _message_debug_payload(message),
+                },
+            )
         invocation, raw_response = _extract_tool_invocation(message)
         _validate_tool_choice(invocation, observation)
         action = tool_invocation_to_action(
@@ -388,6 +432,18 @@ def choose_action(
             invocation,
         )
     except Exception as error:
+        if debug_enabled():
+            write_debug_event(
+                "llm.error",
+                {
+                    "stage": "chat.tools",
+                    "model": MODEL_NAME,
+                    "base_url": API_BASE_URL,
+                    "error_type": type(error).__name__,
+                    "error": str(error),
+                    "response": raw_response,
+                },
+            )
         print(f"[DEBUG] choose_action failed: {error}", flush=True)
         if raw_response is not None:
             print(
