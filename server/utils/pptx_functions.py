@@ -250,8 +250,21 @@ class PptxEditor:
         bold: Optional[bool] = None,
         italic: Optional[bool] = None,
         color_hex: Optional[str] = None,
+        word_wrap: Optional[bool] = None,
+        space_before_pt: Optional[float] = None,
+        space_after_pt: Optional[float] = None,
+        line_spacing: Optional[float] = None,
     ):
+        if word_wrap is not None:
+            text_frame.word_wrap = word_wrap
+
         for paragraph in text_frame.paragraphs:
+            if space_before_pt is not None:
+                paragraph.space_before = Pt(float(space_before_pt))
+            if space_after_pt is not None:
+                paragraph.space_after = Pt(float(space_after_pt))
+            if line_spacing is not None:
+                paragraph.line_spacing = float(line_spacing)
             self._apply_font_style(
                 paragraph.font,
                 font_name=font_name,
@@ -378,6 +391,7 @@ class PptxEditor:
         slide = self._get_slide_by_id(slide_id)
         textbox = slide.shapes.add_textbox(Inches(x), Inches(y), Inches(cx), Inches(cy))
         textbox.line.fill.background()
+        textbox.text_frame.word_wrap = True
         return textbox.shape_id
 
     def insert_text_by_id(self, slide_id: int, shape_id: int, text: str):
@@ -385,6 +399,7 @@ class PptxEditor:
         if not shape.has_text_frame:
             raise ValueError("Shape has no text frame.")
         shape.text_frame.text = str(text)
+        shape.text_frame.word_wrap = True
 
     def insert_text(self, slide_index: int, shape_index: int, text: str):
         self.insert_text_by_id(
@@ -557,6 +572,10 @@ class PptxEditor:
         bold: Optional[Any] = None,
         italic: Optional[Any] = None,
         color_hex: Optional[Any] = None,
+        word_wrap: Optional[Any] = None,
+        space_before_pt: Optional[Any] = None,
+        space_after_pt: Optional[Any] = None,
+        line_spacing: Optional[Any] = None,
         *,
         theme_name: Optional[str] = None,
         bind_theme: bool = False,
@@ -567,6 +586,10 @@ class PptxEditor:
             "bold": bold,
             "italic": italic,
             "color_hex": color_hex,
+            "word_wrap": word_wrap,
+            "space_before_pt": space_before_pt,
+            "space_after_pt": space_after_pt,
+            "line_spacing": line_spacing,
         }
         resolved_kwargs = self._resolve_bound_kwargs(theme_name, raw_kwargs)
 
@@ -593,6 +616,10 @@ class PptxEditor:
         bold: Optional[bool] = None,
         italic: Optional[bool] = None,
         color_hex: Optional[str] = None,
+        word_wrap: Optional[bool] = None,
+        space_before_pt: Optional[float] = None,
+        space_after_pt: Optional[float] = None,
+        line_spacing: Optional[float] = None,
     ):
         self.style_text_by_id(
             self.get_slide_id(slide_index),
@@ -602,6 +629,10 @@ class PptxEditor:
             bold=bold,
             italic=italic,
             color_hex=color_hex,
+            word_wrap=word_wrap,
+            space_before_pt=space_before_pt,
+            space_after_pt=space_after_pt,
+            line_spacing=line_spacing,
         )
 
     def style_table_by_id(

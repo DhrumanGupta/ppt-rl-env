@@ -299,6 +299,44 @@ def test_style_update_applies_font_settings_to_existing_runs(editor):
     assert str(run.font.color.rgb) == "112233"
 
 
+def test_add_textbox_enables_word_wrap_by_default(editor):
+    slide_index = add_blank_slide(editor)
+    slide_id = editor.get_slide_id(slide_index)
+    shape_id = editor.add_textbox_by_id(slide_id, 1, 1, 4, 1)
+    editor.insert_text_by_id(slide_id, shape_id, "Wrapped by default")
+
+    text_frame = editor._get_shape_by_id(slide_id, shape_id).text_frame
+
+    assert text_frame.word_wrap is True
+
+
+def test_style_text_applies_wrap_and_paragraph_spacing(editor):
+    slide_index = add_blank_slide(editor)
+    shape_index = add_textbox(editor, slide_index, "Line 1\nLine 2")
+
+    editor.style_update(
+        slide_index,
+        shape_index,
+        font_name="Arial",
+        font_size_pt=18,
+        color_hex="#112233",
+        word_wrap=False,
+        space_before_pt=3,
+        space_after_pt=6,
+        line_spacing=1.4,
+    )
+
+    paragraphs = (
+        editor.prs.slides[slide_index].shapes[shape_index].text_frame.paragraphs
+    )
+    text_frame = editor.prs.slides[slide_index].shapes[shape_index].text_frame
+
+    assert text_frame.word_wrap is False
+    assert paragraphs[0].space_before.pt == 3
+    assert paragraphs[0].space_after.pt == 6
+    assert paragraphs[0].line_spacing == 1.4
+
+
 def test_style_update_rejects_non_text_shape(editor):
     slide_index = add_blank_slide(editor)
     slide = editor.prs.slides[slide_index]

@@ -10,7 +10,11 @@ class PptAgentAction(Action):
     """Structured action for the prompt-to-PPT environment skeleton."""
 
     action_type: Literal[
-        "create_slide", "update_slide", "delete_slide", "save_presentation"
+        "create_slide",
+        "update_slide",
+        "delete_slide",
+        "save_presentation",
+        "set_theme",
     ] = Field(..., description="Macro action to execute")
     slide_index: int | None = Field(
         default=None,

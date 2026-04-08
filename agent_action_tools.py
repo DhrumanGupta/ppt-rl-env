@@ -16,48 +16,45 @@ class _StrictModel(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
 
-class TextStyle(_StrictModel):
-    font_name: str | None = Field(
-        default=None, description="Font family or theme token like <font>."
-    )
-    font_size_pt: int | float | str | None = Field(
-        default=None,
-        description="Font size in points or a theme token like <title_size>.",
-    )
+class TextStyleArgs(_StrictModel):
+    font_name: str | None = None
+    font_size_pt: float | str | None = None
     bold: bool | None = None
     italic: bool | None = None
-    color_hex: str | None = Field(
-        default=None, description="Hex color or theme token like <primary>."
-    )
+    color_hex: str | None = None
+    word_wrap: bool | None = None
+    space_before_pt: float | str | None = None
+    space_after_pt: float | str | None = None
+    line_spacing: float | None = None
 
 
-class ChartStyle(_StrictModel):
+class ChartStyleArgs(_StrictModel):
     title: str | None = None
     title_font_name: str | None = None
-    title_font_size_pt: int | float | str | None = None
+    title_font_size_pt: float | str | None = None
     title_bold: bool | None = None
     title_italic: bool | None = None
     title_color_hex: str | None = None
     legend_font_name: str | None = None
-    legend_font_size_pt: int | float | str | None = None
+    legend_font_size_pt: float | str | None = None
     legend_bold: bool | None = None
     legend_italic: bool | None = None
     legend_color_hex: str | None = None
     axis_font_name: str | None = None
-    axis_font_size_pt: int | float | str | None = None
+    axis_font_size_pt: float | str | None = None
     axis_bold: bool | None = None
     axis_italic: bool | None = None
     axis_color_hex: str | None = None
     series_colors: list[str] | None = None
 
 
-class TableStyle(_StrictModel):
+class TableStyleArgs(_StrictModel):
     header_fill_hex: str | None = None
     body_fill_hex: str | None = None
     header_font_name: str | None = None
     body_font_name: str | None = None
-    header_font_size_pt: int | float | str | None = None
-    body_font_size_pt: int | float | str | None = None
+    header_font_size_pt: float | str | None = None
+    body_font_size_pt: float | str | None = None
     header_bold: bool | None = None
     body_bold: bool | None = None
     header_italic: bool | None = None
@@ -66,219 +63,149 @@ class TableStyle(_StrictModel):
     body_font_color_hex: str | None = None
 
 
-class ChartSeries(_StrictModel):
-    name: str
-    values: list[int | float]
+class ThemeArgs(_StrictModel):
+    bg: str | None = None
+    surface: str | None = None
+    accent: str | None = None
+    primary: str | None = None
+    secondary: str | None = None
+    font: str | None = None
+    title_size: float | None = None
+    body_size: float | None = None
+    caption_size: float | None = None
 
 
-class ChartData(_StrictModel):
-    categories: list[str]
-    series: list[ChartSeries]
+class _NamedShapeArgs(_StrictModel):
+    name: str | None = None
 
 
-class CreateAccentBarShape(_StrictModel):
+class _UpdateShapeArgs(_NamedShapeArgs):
+    shape_id: int = Field(ge=1)
+
+
+class CreateAccentBarArgs(_NamedShapeArgs):
     type: Literal["accent_bar"]
-    name: str | None = None
     color_hex: str
-    height: int | float | None = None
+    height: float | None = None
 
 
-class CreateTextShape(_StrictModel):
+class UpdateAccentBarArgs(_UpdateShapeArgs):
+    type: Literal["accent_bar"]
+    color_hex: str | None = None
+    height: float | None = None
+    x: float | None = None
+    y: float | None = None
+    w: float | None = None
+    h: float | None = None
+
+
+class CreateTextArgs(_NamedShapeArgs):
     type: Literal["text"]
-    name: str | None = None
     text: str
-    x: int | float = Field(
-        description="Left position in slide inches. Use values around 0 to 9 on a standard slide."
-    )
-    y: int | float = Field(
-        description="Top position in slide inches. Use values around 0 to 7 on a standard slide."
-    )
-    w: int | float = Field(
-        description="Width in slide inches, typically less than 9.5."
-    )
-    h: int | float = Field(description="Height in slide inches, typically less than 7.")
-    style: TextStyle | None = None
+    x: float
+    y: float
+    w: float
+    h: float
+    style: TextStyleArgs | None = None
 
 
-class CreateCitationShape(_StrictModel):
-    type: Literal["citation"]
-    name: str | None = None
-    text: str
-    x: int | float | None = Field(
-        default=None, description="Left position in slide inches."
-    )
-    y: int | float | None = Field(
-        default=None, description="Top position in slide inches."
-    )
-    w: int | float | None = Field(default=None, description="Width in slide inches.")
-    h: int | float | None = Field(default=None, description="Height in slide inches.")
-    style: TextStyle | None = None
+class UpdateTextArgs(_UpdateShapeArgs):
+    type: Literal["text"]
+    text: str | None = None
+    x: float | None = None
+    y: float | None = None
+    w: float | None = None
+    h: float | None = None
+    style: TextStyleArgs | None = None
 
 
-class CreateChartShape(_StrictModel):
+class CreateChartArgs(_NamedShapeArgs):
     type: Literal["chart"]
-    name: str | None = None
     chart_type: str
-    chart_data: ChartData
-    x: int | float = Field(
-        description="Left position in slide inches. Use values around 0 to 9 on a standard slide."
-    )
-    y: int | float = Field(
-        description="Top position in slide inches. Use values around 0 to 7 on a standard slide."
-    )
-    w: int | float = Field(
-        description="Width in slide inches, typically less than 9.5."
-    )
-    h: int | float = Field(description="Height in slide inches, typically less than 7.")
-    style: ChartStyle | None = None
+    chart_data: dict[str, Any]
+    x: float
+    y: float
+    w: float
+    h: float
+    style: ChartStyleArgs | None = None
 
 
-class CreateTableShape(_StrictModel):
+class UpdateChartArgs(_UpdateShapeArgs):
+    type: Literal["chart"]
+    x: float | None = None
+    y: float | None = None
+    w: float | None = None
+    h: float | None = None
+    style: ChartStyleArgs | None = None
+
+
+class CreateTableArgs(_NamedShapeArgs):
     type: Literal["table"]
-    name: str | None = None
     table_data: list[list[str]]
-    x: int | float = Field(
-        description="Left position in slide inches. Use values around 0 to 9 on a standard slide."
-    )
-    y: int | float = Field(
-        description="Top position in slide inches. Use values around 0 to 7 on a standard slide."
-    )
-    w: int | float = Field(
-        description="Width in slide inches, typically less than 9.5."
-    )
-    h: int | float = Field(description="Height in slide inches, typically less than 7.")
-    style: TableStyle | None = None
+    x: float
+    y: float
+    w: float
+    h: float
+    style: TableStyleArgs | None = None
 
 
-class CreateImageShape(_StrictModel):
+class UpdateTableArgs(_UpdateShapeArgs):
+    type: Literal["table"]
+    x: float | None = None
+    y: float | None = None
+    w: float | None = None
+    h: float | None = None
+    style: TableStyleArgs | None = None
+
+
+class CreateImageArgs(_NamedShapeArgs):
     type: Literal["image"]
-    name: str | None = None
     image_path: str
-    x: int | float = Field(
-        description="Left position in slide inches. Use values around 0 to 9 on a standard slide."
-    )
-    y: int | float = Field(
-        description="Top position in slide inches. Use values around 0 to 7 on a standard slide."
-    )
-    w: int | float | None = Field(
-        default=None, description="Optional width in slide inches."
-    )
-    h: int | float | None = Field(
-        default=None, description="Optional height in slide inches."
-    )
+    x: float
+    y: float
+    w: float | None = None
+    h: float | None = None
 
 
-CreateShapeSpec = Annotated[
-    CreateAccentBarShape
-    | CreateTextShape
-    | CreateCitationShape
-    | CreateChartShape
-    | CreateTableShape
-    | CreateImageShape,
+class UpdateImageArgs(_UpdateShapeArgs):
+    type: Literal["image"]
+    image_path: str | None = None
+    x: float | None = None
+    y: float | None = None
+    w: float | None = None
+    h: float | None = None
+
+
+CreateShapeArgs = Annotated[
+    CreateAccentBarArgs
+    | CreateTextArgs
+    | CreateChartArgs
+    | CreateTableArgs
+    | CreateImageArgs,
     Field(discriminator="type"),
 ]
 
-
-class UpdateAccentBarShape(_StrictModel):
-    type: Literal["accent_bar"]
-    shape_id: int = Field(ge=1)
-    name: str | None = None
-    color_hex: str | None = None
-    height: int | float | None = None
-    x: int | float | None = None
-    y: int | float | None = None
-    w: int | float | None = None
-    h: int | float | None = None
-
-
-class UpdateTextShape(_StrictModel):
-    type: Literal["text"]
-    shape_id: int = Field(ge=1)
-    name: str | None = None
-    text: str | None = None
-    x: int | float | None = None
-    y: int | float | None = None
-    w: int | float | None = None
-    h: int | float | None = None
-    style: TextStyle | None = None
-
-
-class UpdateCitationShape(_StrictModel):
-    type: Literal["citation"]
-    shape_id: int = Field(ge=1)
-    name: str | None = None
-    text: str | None = None
-    x: int | float | None = None
-    y: int | float | None = None
-    w: int | float | None = None
-    h: int | float | None = None
-    style: TextStyle | None = None
-
-
-class UpdateChartShape(_StrictModel):
-    type: Literal["chart"]
-    shape_id: int = Field(ge=1)
-    name: str | None = None
-    x: int | float | None = None
-    y: int | float | None = None
-    w: int | float | None = None
-    h: int | float | None = None
-    style: ChartStyle | None = None
-
-
-class UpdateTableShape(_StrictModel):
-    type: Literal["table"]
-    shape_id: int = Field(ge=1)
-    name: str | None = None
-    x: int | float | None = None
-    y: int | float | None = None
-    w: int | float | None = None
-    h: int | float | None = None
-    style: TableStyle | None = None
-
-
-class UpdateImageShape(_StrictModel):
-    type: Literal["image"]
-    shape_id: int = Field(ge=1)
-    name: str | None = None
-    x: int | float | None = None
-    y: int | float | None = None
-    w: int | float | None = None
-    h: int | float | None = None
-
-
-UpdateShapeSpec = Annotated[
-    UpdateAccentBarShape
-    | UpdateTextShape
-    | UpdateCitationShape
-    | UpdateChartShape
-    | UpdateTableShape
-    | UpdateImageShape,
+UpdateShapeArgs = Annotated[
+    UpdateAccentBarArgs
+    | UpdateTextArgs
+    | UpdateChartArgs
+    | UpdateTableArgs
+    | UpdateImageArgs,
     Field(discriminator="type"),
 ]
 
 
 class CreateSlideArgs(_StrictModel):
-    layout_index: int = Field(
-        default=6,
-        description="Slide layout index. Prefer 6 for a blank slide unless a different layout is clearly needed.",
-    )
-    background_color: str | None = Field(
-        default=None,
-        description="Background fill color or theme token like <bg> or <surface>.",
-    )
-    shapes: list[CreateShapeSpec] = Field(default_factory=list)
+    background_color: str | None = None
+    shapes: list[CreateShapeArgs] = Field(default_factory=list)
 
 
 class UpdateSlideArgs(_StrictModel):
     slide_index: int = Field(ge=1)
-    background_color: str | None = Field(
-        default=None,
-        description="Background fill color or theme token like <bg> or <surface>.",
-    )
+    background_color: str | None = None
     delete_shape_ids: list[int] = Field(default_factory=list)
-    add_shapes: list[CreateShapeSpec] = Field(default_factory=list)
-    update_shapes: list[UpdateShapeSpec] = Field(default_factory=list)
+    add_shapes: list[CreateShapeArgs] = Field(default_factory=list)
+    update_shapes: list[UpdateShapeArgs] = Field(default_factory=list)
 
 
 class DeleteSlideArgs(_StrictModel):
@@ -289,18 +216,24 @@ class SavePresentationArgs(_StrictModel):
     path: str | None = None
 
 
+class SetThemeArgs(ThemeArgs):
+    pass
+
+
 _TOOL_MODELS = {
     "create_slide": CreateSlideArgs,
     "update_slide": UpdateSlideArgs,
     "delete_slide": DeleteSlideArgs,
     "save_presentation": SavePresentationArgs,
+    "set_theme": SetThemeArgs,
 }
 
 _TOOL_DESCRIPTIONS = {
-    "create_slide": "Create a new slide with an explicit layout, background, and full shape list.",
+    "create_slide": "Create a new slide with optional background and shapes.",
     "update_slide": "Refine one existing slide by updating, adding, or deleting shapes.",
     "delete_slide": "Delete one existing slide by its 1-based slide index.",
     "save_presentation": "Write the current presentation to disk when the deck is complete.",
+    "set_theme": "Set default theme tokens by overwriting provided keys on the default theme.",
 }
 
 
@@ -308,12 +241,16 @@ _TOOL_DESCRIPTIONS = {
 class AgentToolInvocation:
     tool_name: str
     arguments_model: (
-        CreateSlideArgs | UpdateSlideArgs | DeleteSlideArgs | SavePresentationArgs
+        CreateSlideArgs
+        | UpdateSlideArgs
+        | DeleteSlideArgs
+        | SavePresentationArgs
+        | SetThemeArgs
     )
 
     @property
     def arguments(self) -> dict[str, Any]:
-        return self.arguments_model.model_dump(exclude_none=True)
+        return self.arguments_model.model_dump(exclude_none=True, exclude_unset=True)
 
 
 def build_openai_tools() -> list[dict[str, Any]]:
@@ -381,6 +318,9 @@ def tool_invocation_to_action(
             action_type="save_presentation",
             payload={"path": arguments.get("path") or default_save_path},
         )
+
+    if invocation.tool_name == "set_theme":
+        return PptAgentAction(action_type="set_theme", payload=arguments)
 
     raise ValueError(f"Unsupported tool '{invocation.tool_name}'")
 

@@ -36,6 +36,8 @@ MAX_TOKENS = int(os.getenv("MAX_TOKENS", "700"))
 BENCHMARK = "ppt_agent"
 
 OPENAI_TOOLS = build_openai_tools()
+print(len(str(OPENAI_TOOLS)))
+quit()
 
 _THEME_TOKENS = {
     "bg": "primary page background",
@@ -73,13 +75,66 @@ SYSTEM_PROMPT = textwrap.dedent(
     - create_slide
     - update_slide
     - delete_slide
+    - set_theme
     - save_presentation
 
     Theme tokens available inside payloads:
     - <bg>, <surface>, <accent>, <primary>, <secondary>
     - <font>, <title_size>, <body_size>, <caption_size>
 
+    You may call set_theme to overwrite one or more default theme tokens for the whole deck.
+    set_theme only updates these default keys:
+    - bg, surface, accent, primary, secondary, font, title_size, body_size, caption_size
+    Omitted keys remain unchanged.
+
+    Use only the tool schema fields exactly as defined.
+    Never invent shorthand slide DSL fields such as:
+    - background -> use background_color
+    - type: title/body -> use type: text
+    - font -> use style.font_name
+    - size -> use style.font_size_pt
+    - color -> use style.color_hex
+
+    Text shapes require explicit geometry in slide inches:
+    - x, y, w, h
+
+    Example create_slide payload:
+    {
+      "background_color": "<bg>",
+      "shapes": [
+        {
+          "type": "text",
+          "text": "Harbor Retail Expansion 2026",
+          "x": 0.7,
+          "y": 0.6,
+          "w": 8.8,
+          "h": 0.8,
+          "style": {
+            "font_name": "<font>",
+            "font_size_pt": "<title_size>",
+            "color_hex": "<primary>",
+            "bold": true
+          }
+        }
+      ]
+    }
+
+    Example set_theme payload:
+    {
+      "bg": "#F8FAFC",
+      "surface": "#FFFFFF",
+      "accent": "#2563EB",
+      "primary": "#0F172A",
+      "secondary": "#475569",
+      "font": "Aptos",
+      "title_size": 28,
+      "body_size": 16,
+      "caption_size": 10
+    }
+
     Make the slides visually appealing and well-structured, and ensure the content addresses the task prompt effectively. This should include a good color scheme, readable fonts, and an appropriate amount of content per slide, with sufficient spacing.
+
+    Always make discord theme dark presentations.
 
     Return no prose. Produce exactly one tool call.
     """
@@ -247,9 +302,11 @@ def _planning_prompt(observation: Any, history: list[dict[str, Any]]) -> str:
                     "create_slide",
                     "update_slide",
                     "delete_slide",
+                    "set_theme",
                     "save_presentation",
                 ],
                 "theme_tokens": _THEME_TOKENS,
+                "current_theme": observation.metadata.get("current_theme", {}),
             },
         },
         separators=(",", ":"),

@@ -7,6 +7,7 @@ from io import BytesIO
 from typing import Any
 
 from pptx import Presentation as load_presentation
+from pptx.enum.dml import MSO_FILL
 from pptx.presentation import Presentation as PptxPresentation
 
 from server.utils.pptx_functions import PptxEditor
@@ -91,7 +92,9 @@ def _shape_line_hex(shape: Any) -> str | None:
     except Exception:
         return None
     try:
-        return _safe_rgb(line.color)
+        if line.fill.type != MSO_FILL.SOLID:
+            return None
+        return _safe_rgb(line.fill.fore_color)
     except Exception:
         return None
 

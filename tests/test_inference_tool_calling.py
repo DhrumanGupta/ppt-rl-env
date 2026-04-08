@@ -4,7 +4,12 @@ from types import SimpleNamespace
 import pytest
 
 from agent_action_tools import parse_tool_invocation, tool_invocation_to_action
-from inference import _planning_prompt, _validate_tool_choice, choose_action
+from inference import (
+    SYSTEM_PROMPT,
+    _planning_prompt,
+    _validate_tool_choice,
+    choose_action,
+)
 
 
 def _observation(**overrides):
@@ -18,6 +23,7 @@ def _observation(**overrides):
         "last_action_error": None,
         "last_action_result": None,
         "score": 0.0,
+        "metadata": {"current_theme": {"accent": "#2563EB", "font": "Aptos"}},
     }
     payload.update(overrides)
     return SimpleNamespace(**payload)
@@ -42,6 +48,9 @@ def test_tool_invocation_to_action_builds_create_slide_payload_directly():
                         "font_size_pt": "<title_size>",
                         "color_hex": "<primary>",
                         "bold": True,
+                        "word_wrap": True,
+                        "space_after_pt": 6,
+                        "line_spacing": 1.2,
                     },
                 }
             ],
@@ -55,6 +64,28 @@ def test_tool_invocation_to_action_builds_create_slide_payload_directly():
     assert action.payload["background_color"] == "<surface>"
     assert action.payload["shapes"][0]["type"] == "text"
     assert action.payload["shapes"][0]["style"]["font_size_pt"] == "<title_size>"
+    assert action.payload["shapes"][0]["style"]["word_wrap"] is True
+    assert action.payload["shapes"][0]["style"]["space_after_pt"] == 6
+
+
+def test_parse_tool_invocation_rejects_invalid_text_style_alias_keys():
+    with pytest.raises(Exception):
+        parse_tool_invocation(
+            "create_slide",
+            {
+                "shapes": [
+                    {
+                        "type": "text",
+                        "text": "Growth remains resilient",
+                        "x": 0.8,
+                        "y": 0.8,
+                        "w": 5.0,
+                        "h": 0.8,
+                        "style": {"color": "<primary>", "font_size": 24},
+                    }
+                ]
+            },
+        )
 
 
 def test_validate_tool_choice_blocks_early_save():
@@ -65,6 +96,46 @@ def test_validate_tool_choice_blocks_early_save():
 
     with pytest.raises(ValueError, match="cannot save"):
         _validate_tool_choice(invocation, observation)
+
+
+def test_tool_invocation_to_action_builds_set_theme_payload_directly():
+    invocation = parse_tool_invocation(
+        "set_theme",
+        {
+            "accent": "#112233",
+            "font": "Inter",
+            "title_size": 30,
+        },
+    )
+
+    action = tool_invocation_to_action(invocation, default_save_path="outputs/out.pptx")
+
+    assert action.action_type == "set_theme"
+    assert action.payload == {
+        "accent": "#112233",
+        "font": "Inter",
+        "title_size": 30,
+    }
+
+
+def test_parse_tool_invocation_rejects_removed_layout_index_field():
+    with pytest.raises(Exception):
+        parse_tool_invocation("create_slide", {"layout_index": 6, "shapes": []})
+
+
+def test_parse_tool_invocation_rejects_removed_citation_shape_type():
+    with pytest.raises(Exception):
+        parse_tool_invocation(
+            "create_slide",
+            {
+                "shapes": [
+                    {
+                        "type": "citation",
+                        "text": "Source: quarterly report",
+                    }
+                ]
+            },
+        )
 
 
 def test_planning_prompt_includes_named_shape_context():
@@ -96,8 +167,21 @@ def test_planning_prompt_includes_named_shape_context():
         "create_slide",
         "update_slide",
         "delete_slide",
+        "set_theme",
         "save_presentation",
     ]
+    assert prompt["requirements"]["current_theme"] == {
+        "accent": "#2563EB",
+        "font": "Aptos",
+    }
+
+
+def test_system_prompt_warns_against_old_macro_dsl_fields():
+    assert "background -> use background_color" in SYSTEM_PROMPT
+    assert "type: title/body -> use type: text" in SYSTEM_PROMPT
+    assert '"font_size_pt"' in SYSTEM_PROMPT
+    assert '"color_hex"' in SYSTEM_PROMPT
+    assert "set_theme" in SYSTEM_PROMPT
 
 
 def test_choose_action_uses_tool_call_and_returns_agent_action():

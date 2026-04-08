@@ -515,6 +515,18 @@ def test_update_slide_rejects_conflicting_delete_and_update(themed_editor):
         )
 
 
+def test_update_theme_merges_with_existing_default_theme(themed_editor):
+    original = themed_editor.get_theme()
+
+    update_theme(themed_editor, {"accent": "#ABCDEF", "font": "Inter"})
+
+    updated = themed_editor.get_theme()
+    assert updated["accent"] == "#ABCDEF"
+    assert updated["font"] == "Inter"
+    assert updated["primary"] == original["primary"]
+    assert updated["body_size"] == original["body_size"]
+
+
 def test_create_slide_rejects_unknown_shape_type(themed_editor):
     with pytest.raises(ValueError, match="Unsupported shape type"):
         create_slide(themed_editor, shapes=[{"type": "unknown"}])

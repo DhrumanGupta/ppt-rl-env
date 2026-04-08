@@ -18,6 +18,7 @@ from server.tools.pptx_tools import (
     delete_slide,
     register_theme,
     save_presentation,
+    update_theme,
     update_slide,
 )
 from server.utils.pptx_extraction import PptxExtractionService
@@ -417,7 +418,10 @@ class PptAgentEnvironment(Environment):
             termination_reason=self._termination_reason,
             done=done,
             reward=reward,
-            metadata={"reward_details": self._last_reward_details or {}},
+            metadata={
+                "reward_details": self._last_reward_details or {},
+                "current_theme": self._editor.get_theme(),
+            },
         )
 
     def _current_task_name(self) -> str:
@@ -536,6 +540,18 @@ class PptAgentEnvironment(Environment):
         return _ActionExecutionResult(
             action_type=action.action_type,
             tool_result=tool_result,
+            affected_slide_index=None,
+            reward=0.0,
+        )
+
+    def _handle_set_theme(self, action: PptAgentAction) -> _ActionExecutionResult:
+        if self._editor is None:
+            raise RuntimeError("Environment must be reset before set_theme")
+        payload = dict(action.payload)
+        update_theme(self._editor, payload)
+        return _ActionExecutionResult(
+            action_type=action.action_type,
+            tool_result={"theme": self._editor.get_theme()},
             affected_slide_index=None,
             reward=0.0,
         )

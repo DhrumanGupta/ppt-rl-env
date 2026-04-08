@@ -264,6 +264,30 @@ def test_delete_slide_returns_zero_reward_and_deletes_slide() -> None:
     assert delete_result["tool_result"]["remaining_slide_count"] == 1
 
 
+def test_set_theme_updates_default_theme_and_observation_metadata() -> None:
+    env = _make_env(max_steps=5)
+    observation = env.reset(seed=7)
+
+    assert observation.metadata["current_theme"]["accent"] == "#2563EB"
+
+    observation = env.step(
+        PptAgentAction(
+            action_type="set_theme",
+            payload={"accent": "#112233", "font": "Inter", "body_size": 18},
+        )
+    )
+
+    assert observation.done is False
+    assert observation.reward == 0.0
+    assert observation.last_action_result is not None
+    assert observation.last_action_result["action_type"] == "set_theme"
+    assert observation.last_action_result["tool_result"]["theme"]["accent"] == "#112233"
+    assert observation.last_action_result["tool_result"]["theme"]["font"] == "Inter"
+    assert observation.metadata["current_theme"]["accent"] == "#112233"
+    assert observation.metadata["current_theme"]["font"] == "Inter"
+    assert observation.metadata["current_theme"]["secondary"] == "#475569"
+
+
 def test_terminal_step_uses_full_presentation_reward() -> None:
     env = _make_env(max_steps=3)
     env.reset(seed=7)
