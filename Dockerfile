@@ -20,6 +20,12 @@ FROM ${BASE_IMAGE}
 
 WORKDIR /app
 
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libreoffice \
+    imagemagick \
+    && if ! command -v magick >/dev/null 2>&1 && command -v convert >/dev/null 2>&1; then ln -s "$(command -v convert)" /usr/local/bin/magick; fi \
+    && rm -rf /var/lib/apt/lists/*
+
 ENV PYTHONUNBUFFERED=1
 
 COPY --from=builder /app /app
