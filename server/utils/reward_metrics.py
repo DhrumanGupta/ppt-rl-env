@@ -46,6 +46,10 @@ def _similarity_model():
     return SentenceTransformer(_DEFAULT_SENTENCE_MODEL)
 
 
+def preload_similarity_model() -> None:
+    _similarity_model()
+
+
 def extract_numbers(text: str | None) -> list[str]:
     if not text:
         return []
@@ -126,8 +130,7 @@ def is_blank_or_title_only(slide: ExtractedSlide) -> bool:
         and slide.title_text
         and non_citation_texts[0] == slide.title_text
         and not any(
-            shape.shape_kind in {"chart", "table", "image"}
-            for shape in slide.shapes
+            shape.shape_kind in {"chart", "table", "image"} for shape in slide.shapes
         )
     ):
         return True
@@ -141,6 +144,7 @@ __all__ = [
     "extract_numbers",
     "is_blank_or_title_only",
     "normalize_text",
+    "preload_similarity_model",
     "slide_text_corpus",
     "text_match_score",
 ]

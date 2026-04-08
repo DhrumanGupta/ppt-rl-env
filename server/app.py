@@ -38,9 +38,11 @@ except Exception as e:  # pragma: no cover
 try:
     from ..models import PptAgentAction, PptAgentObservation
     from .ppt_agent_environment import PptAgentEnvironment
+    from .utils.reward_metrics import preload_similarity_model
 except ImportError:
     from models import PptAgentAction, PptAgentObservation
     from server.ppt_agent_environment import PptAgentEnvironment
+    from server.utils.reward_metrics import preload_similarity_model
 
 
 # Create the app with web interface and README integration
@@ -51,6 +53,11 @@ app = create_app(
     env_name="ppt_agent",
     max_concurrent_envs=4,
 )
+
+
+@app.on_event("startup")
+async def preload_models() -> None:
+    preload_similarity_model()
 
 
 def main(host: str = "0.0.0.0", port: int = 8000):
