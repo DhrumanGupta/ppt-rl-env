@@ -11,42 +11,37 @@
         "tone": "professional",
         "extra_constraints": {}
       },
-      "theme": {
-        "bg": "#F8FAFC",
-        "surface": "#FFFFFF",
-        "accent": "#2563EB",
-        "primary": "#0F172A",
-        "secondary": "#475569",
-        "font": "Aptos",
-        "title_size": 28,
-        "body_size": 16,
-        "caption_size": 10
-      },
-      "source_documents": [
-        {
-          "doc_id": "retail_memo",
-          "title": "Harbor retail expansion memo",
-          "path": null,
-          "mime_type": "text/plain",
-          "text": "Harbor Retail Expansion 2026 focuses on urban store performance and fulfillment reliability. Leadership launched the program after margin pressure in city-format stores and inconsistent delivery service in top metro markets. Same-store sales increased from 4.2% to 6.1% after regional assortment updates. Delivery complaints fell by 22% after consolidating the final-mile carrier mix and tightening service-level monitoring.",
-          "pages": null,
-          "images": null,
-          "metadata": {}
-        },
-        {
-          "doc_id": "ops_note",
-          "title": "Store operations note",
-          "path": null,
-          "mime_type": "text/plain",
-          "text": "The operating focus of the expansion was higher in-stock accuracy, faster replenishment for urban stores, and a more reliable delivery handoff for online orders. Management positioned the initiative as a practical growth lever rather than a large-format expansion bet.",
-          "pages": null,
-          "images": null,
-          "metadata": {}
-        }
-      ],
-      "metadata": {
-        "domain": "business",
-        "curriculum_stage": 1
+      "source_pack": {
+        "brief": "This source pack combines program rationale, operating changes, and a KPI readout. Use exact numbers only where quoted directly. Distinguish the operating focus from the business results.",
+        "documents": [
+          {
+            "doc_id": "retail_memo",
+            "title": "Harbor retail expansion memo",
+            "mime_type": "text/plain",
+            "pages": [
+              "Harbor Retail Expansion 2026 focuses on urban store performance and fulfillment reliability. Leadership launched the program after margin pressure in city-format stores and inconsistent delivery service in top metro markets.",
+              "Management described the initiative as an operating improvement program, not a return to broad large-format expansion. The work centered on making existing urban stores more dependable and more productive."
+            ]
+          },
+          {
+            "doc_id": "ops_note",
+            "title": "Store operations note",
+            "mime_type": "text/plain",
+            "pages": [
+              "The operating focus of the expansion was higher in-stock accuracy, faster replenishment for urban stores, and a more reliable delivery handoff for online orders.",
+              "Management positioned the initiative as a practical growth lever rather than a large-format expansion bet."
+            ]
+          },
+          {
+            "doc_id": "results_snapshot",
+            "title": "Regional results snapshot",
+            "mime_type": "text/plain",
+            "pages": [
+              "Same-store sales increased from 4.2% to 6.1% after regional assortment updates and tighter urban inventory controls.",
+              "Delivery complaints fell by 22% after consolidating the final-mile carrier mix and tightening service-level monitoring."
+            ]
+          }
+        ]
       }
     },
     {
@@ -60,42 +55,37 @@
         "tone": "professional",
         "extra_constraints": {}
       },
-      "theme": {
-        "bg": "#F6FAFD",
-        "surface": "#FFFFFF",
-        "accent": "#0F766E",
-        "primary": "#0B1F2A",
-        "secondary": "#48616E",
-        "font": "Aptos",
-        "title_size": 28,
-        "body_size": 16,
-        "caption_size": 10
-      },
-      "source_documents": [
-        {
-          "doc_id": "clinic_brief",
-          "title": "Lattice clinic operations brief",
-          "path": null,
-          "mime_type": "text/plain",
-          "text": "Lattice Health launched the Intake Redesign program to reduce front-desk bottlenecks and improve visit readiness. The redesign combined digital pre-visit forms, earlier insurance validation, and nurse triage routing for patients with chronic-care follow-up needs.",
-          "pages": null,
-          "images": null,
-          "metadata": {}
-        },
-        {
-          "doc_id": "performance_snapshot",
-          "title": "Performance snapshot",
-          "path": null,
-          "mime_type": "text/plain",
-          "text": "Average intake time declined from 19 minutes to 11 minutes within eight weeks of rollout. The no-show rate improved from 14% to 9% after reminder timing and digital form completion were linked. Operations leadership highlighted shorter queues, better exam-room utilization, and fewer manual eligibility calls.",
-          "pages": null,
-          "images": null,
-          "metadata": {}
-        }
-      ],
-      "metadata": {
-        "domain": "healthcare",
-        "curriculum_stage": 1
+      "source_pack": {
+        "brief": "The material separates program intent, workflow design, and post-rollout outcomes. Keep operational changes on the workflow slide and save the measured results for the final slide.",
+        "documents": [
+          {
+            "doc_id": "clinic_brief",
+            "title": "Lattice clinic operations brief",
+            "mime_type": "text/plain",
+            "pages": [
+              "Lattice Health launched the Intake Redesign program to reduce front-desk bottlenecks and improve visit readiness.",
+              "Operations leadership framed the redesign as a way to shorten patient queues while making providers see patients who were better prepared for the visit."
+            ]
+          },
+          {
+            "doc_id": "workflow_note",
+            "title": "Workflow redesign note",
+            "mime_type": "text/plain",
+            "pages": [
+              "The redesign combined digital pre-visit forms, earlier insurance validation, and nurse triage routing for patients with chronic-care follow-up needs.",
+              "Reminder timing was adjusted so digital form completion happened before arrival instead of at the front desk."
+            ]
+          },
+          {
+            "doc_id": "performance_snapshot",
+            "title": "Performance snapshot",
+            "mime_type": "text/plain",
+            "pages": [
+              "Average intake time declined from 19 minutes to 11 minutes within eight weeks of rollout.",
+              "The no-show rate improved from 14% to 9% after reminder timing and digital form completion were linked. Operations leadership also highlighted shorter queues, better exam-room utilization, and fewer manual eligibility calls."
+            ]
+          }
+        ]
       }
     },
     {
@@ -109,42 +99,37 @@
         "tone": "professional",
         "extra_constraints": {}
       },
-      "theme": {
-        "bg": "#F8FAFC",
-        "surface": "#FFFFFF",
-        "accent": "#2563EB",
-        "primary": "#0F172A",
-        "secondary": "#475569",
-        "font": "Aptos",
-        "title_size": 28,
-        "body_size": 16,
-        "caption_size": 10
-      },
-      "source_documents": [
-        {
-          "doc_id": "memo",
-          "title": "Northstar plan memo",
-          "path": null,
-          "mime_type": "text/plain",
-          "text": "Northstar Growth Plan 2026 focuses on retention and onboarding. Leadership framed the plan as a path to more efficient expansion in enterprise accounts. Enterprise retention improved from 88% to 93%. Guided automation reduced onboarding time by 35%. Quarterly revenue targets are 18, 24, 28, and 32 million dollars.",
-          "pages": null,
-          "images": null,
-          "metadata": {}
-        },
-        {
-          "doc_id": "commercial_note",
-          "title": "Commercial strategy note",
-          "path": null,
-          "mime_type": "text/plain",
-          "text": "The commercial team linked higher retention to better net revenue durability and lower replacement-selling pressure. Faster onboarding improved time-to-value for new customers and reduced implementation backlog for customer success teams.",
-          "pages": null,
-          "images": null,
-          "metadata": {}
-        }
-      ],
-      "metadata": {
-        "domain": "business",
-        "curriculum_stage": 2
+      "source_pack": {
+        "brief": "Use the source pack to separate strategy, commercial impact, and quantified operating outcomes. The final slide should visualize the quarterly targets rather than repeat them as bullets.",
+        "documents": [
+          {
+            "doc_id": "plan_memo",
+            "title": "Northstar plan memo",
+            "mime_type": "text/plain",
+            "pages": [
+              "Northstar Growth Plan 2026 focuses on retention and onboarding. Leadership framed the plan as a path to more efficient expansion in enterprise accounts.",
+              "Enterprise retention improved from 88% to 93%. Guided automation reduced onboarding time by 35%."
+            ]
+          },
+          {
+            "doc_id": "commercial_note",
+            "title": "Commercial strategy note",
+            "mime_type": "text/plain",
+            "pages": [
+              "The commercial team linked higher retention to better net revenue durability and lower replacement-selling pressure.",
+              "Faster onboarding improved time-to-value for new customers and reduced implementation backlog for customer success teams."
+            ]
+          },
+          {
+            "doc_id": "finance_targets",
+            "title": "Finance target sheet",
+            "mime_type": "text/plain",
+            "pages": [
+              "Quarterly revenue targets are 18, 24, 28, and 32 million dollars.",
+              "Leadership expects the step-up to come from stronger renewals and faster activation of newly signed enterprise accounts."
+            ]
+          }
+        ]
       }
     },
     {
@@ -158,42 +143,38 @@
         "tone": "professional",
         "extra_constraints": {}
       },
-      "theme": {
-        "bg": "#FBFBF8",
-        "surface": "#FFFFFF",
-        "accent": "#B45309",
-        "primary": "#1F2937",
-        "secondary": "#5B6470",
-        "font": "Aptos",
-        "title_size": 28,
-        "body_size": 16,
-        "caption_size": 10
-      },
-      "source_documents": [
-        {
-          "doc_id": "network_brief",
-          "title": "Network reset brief",
-          "path": null,
-          "mime_type": "text/plain",
-          "text": "Solstice Logistics launched a network reset to restore service reliability in fast-growing regional corridors. The plan reduced low-density routes, shifted parcel flow into two upgraded sort hubs, and redesigned line-haul schedules around later order cutoffs.",
-          "pages": null,
-          "images": null,
-          "metadata": {}
-        },
-        {
-          "doc_id": "performance_pack",
-          "title": "Performance pack",
-          "path": null,
-          "mime_type": "text/plain",
-          "text": "On-time delivery improved from 91% to 96% after the route reset. Line-haul cost per package fell by 13% due to denser trailer utilization and fewer partial overnight runs. Quarterly package volume targets are 52, 56, 61, and 68 million parcels.",
-          "pages": null,
-          "images": null,
-          "metadata": {}
-        }
-      ],
-      "metadata": {
-        "domain": "operations",
-        "curriculum_stage": 2
+      "source_pack": {
+        "brief": "The packet includes network design actions, operating logic, and results. Keep route and hub changes together, and reserve the KPI slide for quantified outcomes with attribution.",
+        "documents": [
+          {
+            "doc_id": "network_brief",
+            "title": "Network reset brief",
+            "mime_type": "text/plain",
+            "pages": [
+              "Solstice Logistics launched a network reset to restore service reliability in fast-growing regional corridors.",
+              "The plan reduced low-density routes, shifted parcel flow into two upgraded sort hubs, and redesigned line-haul schedules around later order cutoffs."
+            ]
+          },
+          {
+            "doc_id": "operating_logic",
+            "title": "Operating logic note",
+            "mime_type": "text/plain",
+            "pages": [
+              "Leadership expected the hub changes to increase trailer density and reduce avoidable cross-dock touches.",
+              "Route simplification was intended to stabilize late-day service in corridors that had outgrown the prior network design."
+            ]
+          },
+          {
+            "doc_id": "performance_pack",
+            "title": "Performance pack",
+            "mime_type": "text/plain",
+            "pages": [
+              "On-time delivery improved from 91% to 96% after the route reset.",
+              "Line-haul cost per package fell by 13% due to denser trailer utilization and fewer partial overnight runs.",
+              "Quarterly package volume targets are 52, 56, 61, and 68 million parcels."
+            ]
+          }
+        ]
       }
     },
     {
@@ -207,42 +188,38 @@
         "tone": "formal",
         "extra_constraints": {}
       },
-      "theme": {
-        "bg": "#F8FAFC",
-        "surface": "#FFFFFF",
-        "accent": "#2563EB",
-        "primary": "#0F172A",
-        "secondary": "#475569",
-        "font": "Aptos",
-        "title_size": 28,
-        "body_size": 16,
-        "caption_size": 10
-      },
-      "source_documents": [
-        {
-          "doc_id": "ops_brief",
-          "title": "Aurora cloud operating brief",
-          "path": null,
-          "mime_type": "text/plain",
-          "text": "Aurora Cloud Efficiency Program aligned infrastructure cost controls with premium enterprise growth. Gross margin improved from 61% to 67% after reserved-capacity optimization. Incident resolution time dropped by 41% after workflow consolidation. Quarterly revenue targets are 42, 48, 57, and 63 million dollars.",
-          "pages": null,
-          "images": null,
-          "metadata": {}
-        },
-        {
-          "doc_id": "finance_note",
-          "title": "Aurora finance note",
-          "path": null,
-          "mime_type": "text/plain",
-          "text": "Finance leadership expects revenue acceleration to be strongest in the second half, with Q3 and Q4 targets dependent on enterprise renewals and new cloud migration packages. Management emphasized that efficiency gains should support both profitability and premium-service credibility.",
-          "pages": null,
-          "images": null,
-          "metadata": {}
-        }
-      ],
-      "metadata": {
-        "domain": "business",
-        "curriculum_stage": 3
+      "source_pack": {
+        "brief": "This packet is aimed at an executive readout. Separate strategic context from outcome slides, and keep the chart focused on the revenue target sequence instead of mixing in unrelated metrics.",
+        "documents": [
+          {
+            "doc_id": "ops_brief",
+            "title": "Aurora cloud operating brief",
+            "mime_type": "text/plain",
+            "pages": [
+              "Aurora Cloud Efficiency Program aligned infrastructure cost controls with premium enterprise growth.",
+              "Management emphasized that efficiency gains should support both profitability and premium-service credibility."
+            ]
+          },
+          {
+            "doc_id": "context_note",
+            "title": "Enterprise growth context note",
+            "mime_type": "text/plain",
+            "pages": [
+              "Finance leadership expects revenue acceleration to be strongest in the second half, with Q3 and Q4 targets dependent on enterprise renewals and new cloud migration packages.",
+              "Executives positioned efficiency as necessary to scale premium service without eroding margins in larger enterprise accounts."
+            ]
+          },
+          {
+            "doc_id": "results_sheet",
+            "title": "Efficiency results sheet",
+            "mime_type": "text/plain",
+            "pages": [
+              "Gross margin improved from 61% to 67% after reserved-capacity optimization.",
+              "Incident resolution time dropped by 41% after workflow consolidation.",
+              "Quarterly revenue targets are 42, 48, 57, and 63 million dollars."
+            ]
+          }
+        ]
       }
     },
     {
@@ -256,42 +233,38 @@
         "tone": "formal",
         "extra_constraints": {}
       },
-      "theme": {
-        "bg": "#FAF8F5",
-        "surface": "#FFFFFF",
-        "accent": "#7C3AED",
-        "primary": "#1F1B2D",
-        "secondary": "#5F5A72",
-        "font": "Aptos",
-        "title_size": 28,
-        "body_size": 16,
-        "caption_size": 10
-      },
-      "source_documents": [
-        {
-          "doc_id": "board_pack",
-          "title": "Capital discipline board pack",
-          "path": null,
-          "mime_type": "text/plain",
-          "text": "Quarry Energy introduced a Capital Discipline Program after directors questioned return quality under volatile commodity pricing. Management tightened discretionary spend approvals, deferred two low-return field expansions, and shifted maintenance planning toward predictive scheduling. Free cash flow margin increased from 9% to 15% over the following two quarters.",
-          "pages": null,
-          "images": null,
-          "metadata": {}
-        },
-        {
-          "doc_id": "asset_note",
-          "title": "Asset reliability note",
-          "path": null,
-          "mime_type": "text/plain",
-          "text": "Unplanned maintenance downtime fell by 28% after sensor-based inspections replaced fixed-interval checks on priority assets. Quarterly capital deployment values were 110, 95, 88, and 92 million dollars, reflecting the sharper allocation discipline.",
-          "pages": null,
-          "images": null,
-          "metadata": {}
-        }
-      ],
-      "metadata": {
-        "domain": "energy",
-        "curriculum_stage": 3
+      "source_pack": {
+        "brief": "Board audiences will expect a clear distinction between the governance concern, the intervention, and the measured payoff. Use exact values for margin, downtime, and capital deployment.",
+        "documents": [
+          {
+            "doc_id": "board_pack",
+            "title": "Capital discipline board pack",
+            "mime_type": "text/plain",
+            "pages": [
+              "Quarry Energy introduced a Capital Discipline Program after directors questioned return quality under volatile commodity pricing.",
+              "Management tightened discretionary spend approvals and deferred two low-return field expansions."
+            ]
+          },
+          {
+            "doc_id": "portfolio_actions",
+            "title": "Portfolio and maintenance actions note",
+            "mime_type": "text/plain",
+            "pages": [
+              "Maintenance planning shifted toward predictive scheduling rather than fixed-interval checks on priority assets.",
+              "Leadership described the program as sharper allocation discipline rather than a broad retreat from growth investment."
+            ]
+          },
+          {
+            "doc_id": "asset_note",
+            "title": "Asset reliability note",
+            "mime_type": "text/plain",
+            "pages": [
+              "Free cash flow margin increased from 9% to 15% over the following two quarters.",
+              "Unplanned maintenance downtime fell by 28% after sensor-based inspections replaced fixed-interval checks on priority assets.",
+              "Quarterly capital deployment values were 110, 95, 88, and 92 million dollars."
+            ]
+          }
+        ]
       }
     }
   ]

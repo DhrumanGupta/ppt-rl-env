@@ -29,6 +29,7 @@ class SourceDocument:
 class SourcePack:
     task_id: str
     documents: list[SourceDocument]
+    brief: str | None = None
     metadata: dict[str, Any] = field(default_factory=dict)
 
 

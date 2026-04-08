@@ -1,4 +1,5 @@
 import pytest
+from pptx.enum.dml import MSO_FILL
 from pptx import Presentation
 
 from server.tools.pptx_tools import (
@@ -110,6 +111,7 @@ def test_create_slide_creates_mixed_shapes_and_named_shape_mapping(themed_editor
     assert title_shape.text_frame.paragraphs[0].font.name == "Arial"
     assert title_shape.text_frame.paragraphs[0].font.size.pt == 24
     assert str(title_shape.text_frame.paragraphs[0].font.color.rgb) == "102A43"
+    assert title_shape.line.fill.type == MSO_FILL.BACKGROUND
 
 
 def test_update_slide_can_delete_add_and_update_in_one_call(themed_editor):
