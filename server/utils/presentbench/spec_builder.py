@@ -30,6 +30,7 @@ DEFAULT_PRESENTBENCH_SCORING_CONFIG = {
         "tiny_text": 0.01,
         "redundancy": 0.03,
         "wrong_slot_behavior": 0.02,
+        "visual_sparsity": 0.30,
     },
 }
 

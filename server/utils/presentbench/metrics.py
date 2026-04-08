@@ -4,6 +4,7 @@ from collections import defaultdict
 from typing import Any
 
 from server.utils.reward_metrics import (
+    clamp,
     compute_overlap_ratio,
     deck_text_corpus,
     extract_numbers,
@@ -31,6 +32,9 @@ def compute_presentation_diagnostics(
     ]
     overlap_ratios = [compute_overlap_ratio(slide) for slide in extraction.slides]
     blank_count = sum(1 for slide in extraction.slides if is_blank_or_title_only(slide))
+    visual_sparsity = [
+        compute_visual_sparsity_penalty(slide)["penalty"] for slide in extraction.slides
+    ]
     all_fonts = {
         font
         for slide in extraction.slides
@@ -53,6 +57,10 @@ def compute_presentation_diagnostics(
         else 1.0,
         "min_font_size_pt": min(min_font_sizes) if min_font_sizes else None,
         "max_overlap_ratio": max(overlap_ratios) if overlap_ratios else 0.0,
+        "mean_visual_sparsity_penalty": (
+            sum(visual_sparsity) / len(visual_sparsity) if visual_sparsity else 0.0
+        ),
+        "max_visual_sparsity_penalty": max(visual_sparsity) if visual_sparsity else 0.0,
         "unique_font_family_count": len(all_fonts),
     }
 
@@ -259,6 +267,188 @@ def score_slide_checklist_item(
     }
 
 
+def _hex_to_rgb(color_hex: str | None) -> tuple[int, int, int] | None:
+    if not color_hex:
+        return None
+    normalized = color_hex.strip().lstrip("#")
+    if len(normalized) != 6:
+        return None
+    try:
+        return (
+            int(normalized[0:2], 16),
+            int(normalized[2:4], 16),
+            int(normalized[4:6], 16),
+        )
+    except ValueError:
+        return None
+
+
+def compute_visual_sparsity_penalty(slide: ExtractedSlide) -> dict[str, Any]:
+    occupied_area_ratio = float(slide.layout_metrics.get("occupied_area_ratio", 0.0))
+    text_word_count = len((slide_text_corpus(slide) or "").split())
+    non_text_shape_count = sum(
+        1 for shape in slide.shapes if shape.shape_kind not in {"text", "citation"}
+    )
+    rich_visual_count = (
+        int(slide.layout_metrics.get("chart_count", 0))
+        + int(slide.layout_metrics.get("table_count", 0))
+        + int(slide.layout_metrics.get("image_count", 0))
+    )
+    palette = slide.color_metrics.get("palette", [])
+    palette_size = len(palette)
+    background_rgb = _hex_to_rgb(slide.background_color_hex)
+    plain_light_background = False
+    if background_rgb is not None:
+        plain_light_background = (
+            min(background_rgb) >= 250
+            and (max(background_rgb) - min(background_rgb)) <= 4
+        )
+
+    occupancy_penalty = 1.0 - clamp((occupied_area_ratio - 0.03) / 0.12)
+    text_penalty = 1.0 - clamp((text_word_count - 4.0) / 20.0)
+    non_text_penalty = (
+        0.0 if non_text_shape_count >= 2 else 1.0 - 0.5 * non_text_shape_count
+    )
+    palette_penalty = 1.0 if palette_size <= 2 else 0.5 if palette_size == 3 else 0.0
+    plain_background_penalty = 1.0 if plain_light_background else 0.0
+
+    penalty = clamp(
+        0.25 * occupancy_penalty
+        + 0.15 * text_penalty
+        + 0.10 * non_text_penalty
+        + 0.10 * palette_penalty
+        + 0.40 * plain_background_penalty
+    )
+    if rich_visual_count > 0:
+        penalty = clamp(penalty - 0.20)
+    elif non_text_shape_count > 0 and not plain_light_background:
+        penalty = clamp(penalty - 0.15)
+
+    return {
+        "penalty": penalty,
+        "occupied_area_ratio": occupied_area_ratio,
+        "text_word_count": text_word_count,
+        "non_text_shape_count": non_text_shape_count,
+        "rich_visual_count": rich_visual_count,
+        "palette_size": palette_size,
+        "plain_light_background": plain_light_background,
+    }
+
+
+def score_generic_slide_checklist_items(
+    slide: ExtractedSlide,
+    task_spec: TaskSpec,
+) -> list[dict[str, Any]]:
+    slide_text = slide_text_corpus(slide)
+    slide_title = slide.title_text or ""
+    normalized_slide_text = normalize_text(slide_text)
+    required_points = task_spec.required_points[:6]
+    matched_points = [
+        point for point in required_points if text_match_score(slide_text, point) >= 0.6
+    ]
+    matched_sections = [
+        section
+        for section in task_spec.required_sections
+        if text_match_score(slide_title or slide_text, section) >= 0.3
+        or text_match_score(slide_text, section) >= 0.3
+    ]
+    source_supported = _source_supported(slide_text, task_spec)
+    slide_numbers = extract_numbers(slide_text)
+    source_values = set(task_spec.metadata.get("source_values", []))
+    numeric_supported = not slide_numbers or set(slide_numbers).issubset(source_values)
+    overlap = compute_overlap_ratio(slide)
+    min_font = slide.text_metrics.get("min_font_size_pt")
+    readable = overlap <= 0.08 and (min_font is None or min_font >= 10)
+    visual_kinds = {shape.shape_kind for shape in slide.shapes}
+    quantitative_visual_present = bool(visual_kinds & {"chart", "table"})
+    prompt_alignment_score = max(
+        text_match_score(slide_title or slide_text, task_spec.prompt),
+        max(
+            [text_match_score(slide_text, point) for point in matched_points],
+            default=0.0,
+        ),
+        max(
+            [
+                text_match_score(slide_title or slide_text, section)
+                for section in matched_sections
+            ],
+            default=0.0,
+        ),
+    )
+    contribution_score = (
+        len(matched_points) / len(required_points)
+        if required_points
+        else prompt_alignment_score
+    )
+    if task_spec.require_quantitative_content:
+        contribution_score = min(
+            1.0,
+            0.8 * contribution_score + 0.2 * float(quantitative_visual_present),
+        )
+
+    return [
+        {
+            "item_id": f"slide_{slide.slide_index:02d}_generic_prompt_alignment",
+            "dimension": "prompt_alignment",
+            "verdict": "yes" if prompt_alignment_score >= 0.35 else "no",
+            "score": prompt_alignment_score,
+            "evidence": {
+                "matched_sections": matched_sections,
+                "matched_required_points": matched_points,
+            },
+            "target_role": None,
+            "title_hint": None,
+        },
+        {
+            "item_id": f"slide_{slide.slide_index:02d}_generic_completeness",
+            "dimension": "local_completeness",
+            "verdict": "yes" if contribution_score >= 0.3 else "no",
+            "score": contribution_score,
+            "evidence": {
+                "matched_required_points": matched_points,
+                "required_point_count": len(required_points),
+                "quantitative_visual_present": quantitative_visual_present,
+            },
+            "target_role": None,
+            "title_hint": None,
+        },
+        {
+            "item_id": f"slide_{slide.slide_index:02d}_generic_correctness",
+            "dimension": "local_correctness",
+            "verdict": "yes" if source_supported and numeric_supported else "no",
+            "score": 1.0 if source_supported and numeric_supported else 0.0,
+            "evidence": {
+                "numeric_supported": numeric_supported,
+                "slide_numbers": slide_numbers,
+            },
+            "target_role": None,
+            "title_hint": None,
+        },
+        {
+            "item_id": f"slide_{slide.slide_index:02d}_generic_fidelity",
+            "dimension": "local_fidelity",
+            "verdict": "yes" if source_supported else "no",
+            "score": 1.0 if source_supported else 0.0,
+            "evidence": {"source_supported": source_supported},
+            "target_role": None,
+            "title_hint": None,
+        },
+        {
+            "item_id": f"slide_{slide.slide_index:02d}_generic_usability",
+            "dimension": "local_usability",
+            "verdict": "yes" if readable else "no",
+            "score": 1.0 if readable else 0.0,
+            "evidence": {
+                "overlap_ratio": overlap,
+                "min_font_size_pt": min_font,
+                "has_text": bool(normalized_slide_text),
+            },
+            "target_role": None,
+            "title_hint": None,
+        },
+    ]
+
+
 def mean_scores_by_dimension(results: list[dict[str, Any]]) -> dict[str, float]:
     grouped: dict[str, list[float]] = defaultdict(list)
     for result in results:
@@ -285,10 +475,12 @@ def redundancy_score(
 
 
 __all__ = [
+    "compute_visual_sparsity_penalty",
     "compute_aesthetics_scores",
     "compute_presentation_diagnostics",
     "mean_scores_by_dimension",
     "redundancy_score",
     "score_checklist_item",
+    "score_generic_slide_checklist_items",
     "score_slide_checklist_item",
 ]
