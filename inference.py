@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import json
 import os
+from pathlib import Path
 import re
 import textwrap
 from typing import Any
@@ -27,6 +28,7 @@ TASK_DIFFICULTY = os.getenv("TASK_DIFFICULTY", "easy")
 MAX_STEPS = int(os.getenv("MAX_STEPS", "8"))
 TEMPERATURE = float(os.getenv("TEMPERATURE", "0.1"))
 MAX_TOKENS = int(os.getenv("MAX_TOKENS", "700"))
+DEBUG = os.getenv("DEBUG", "false").strip().lower() in {"1", "true", "yes", "on"}
 
 BENCHMARK = "ppt_agent"
 
@@ -155,6 +157,26 @@ def _default_output_path(task_name: str, difficulty: str) -> str:
     safe_task = task_name or "presentation"
     safe_difficulty = difficulty or "unknown"
     return os.path.join("outputs", f"{safe_task}_{safe_difficulty}_inference.pptx")
+
+
+def _debug_log_path(task_name: str, difficulty: str) -> str:
+    safe_task = task_name or "presentation"
+    safe_difficulty = difficulty or "unknown"
+    return os.path.join("outputs", f"{safe_task}_{safe_difficulty}_debug.json")
+
+
+def _write_debug_log(path: str, payload: dict[str, Any]) -> None:
+    output_path = Path(path)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    output_path.write_text(
+        json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8"
+    )
+
+
+def _reward_details(observation: Any) -> dict[str, Any]:
+    metadata = getattr(observation, "metadata", None) or {}
+    reward_details = metadata.get("reward_details")
+    return reward_details if isinstance(reward_details, dict) else {}
 
 
 def _infer_target_slide_count(task_prompt: str) -> int | None:
@@ -524,10 +546,12 @@ async def main() -> None:
     client = OpenAI(base_url=API_BASE_URL, api_key=HF_TOKEN)
     rewards: list[float] = []
     history: list[dict[str, Any]] = []
+    debug_steps: list[dict[str, Any]] = []
     steps_taken = 0
     score = 0.0
     success = False
     started = False
+    debug_log_path: str | None = None
 
     try:
         async with PptAgentEnv(base_url=ENV_BASE_URL, message_timeout_s=180.0) as env:
@@ -539,6 +563,11 @@ async def main() -> None:
                 model=MODEL_NAME,
             )
             started = True
+            if DEBUG:
+                debug_log_path = _debug_log_path(
+                    observation.task_name,
+                    observation.difficulty,
+                )
 
             for step in range(1, MAX_STEPS + 1):
                 if result.done:
@@ -552,6 +581,34 @@ async def main() -> None:
                 rewards.append(reward)
                 history.append(history_entry)
                 steps_taken = step
+                if DEBUG and debug_log_path is not None:
+                    debug_steps.append(
+                        {
+                            "step": step,
+                            "action": {
+                                "action_type": action.action_type,
+                                "slide_index": action.slide_index,
+                                "payload": action.payload,
+                            },
+                            "reward": reward,
+                            "done": result.done,
+                            "error": observation.last_action_error,
+                            "score": float(observation.score or 0.0),
+                            "last_action_result": observation.last_action_result,
+                            "reward_details": _reward_details(observation),
+                        }
+                    )
+                    _write_debug_log(
+                        debug_log_path,
+                        {
+                            "task_name": observation.task_name,
+                            "difficulty": observation.difficulty,
+                            "model": MODEL_NAME,
+                            "env": BENCHMARK,
+                            "debug": True,
+                            "steps": debug_steps,
+                        },
+                    )
                 log_step(
                     step=step,
                     action=action_str,
@@ -569,6 +626,23 @@ async def main() -> None:
                 and observation.score > 0.0
             )
             score = float(observation.score or 0.0)
+            if DEBUG and debug_log_path is not None:
+                _write_debug_log(
+                    debug_log_path,
+                    {
+                        "task_name": observation.task_name,
+                        "difficulty": observation.difficulty,
+                        "model": MODEL_NAME,
+                        "env": BENCHMARK,
+                        "debug": True,
+                        "success": success,
+                        "score": score,
+                        "steps_taken": steps_taken,
+                        "rewards": rewards,
+                        "steps": debug_steps,
+                        "final_reward_details": _reward_details(observation),
+                    },
+                )
     except Exception as error:
         print(f"[DEBUG] inference failed: {error}", flush=True)
         success = False

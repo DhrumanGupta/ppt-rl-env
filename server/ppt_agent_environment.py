@@ -28,6 +28,7 @@ from server.utils.reward_kernel import (
     evaluate_slide,
 )
 from server.utils.reward_models import EvalSpec, ExtractedPresentation
+from server.utils.reward_models import to_serializable
 from server.utils.slidesgenbench import (
     QuantitativeQuizJudgeService,
     QuizBankGenerationService,
@@ -98,6 +99,7 @@ class PptAgentEnvironment(Environment):
         self._editor: PptxEditor | None = None
         self._last_score = 0.0
         self._last_action_result: dict[str, Any] | None = None
+        self._last_reward_details: dict[str, Any] | None = None
 
     def reset(
         self,
@@ -117,6 +119,7 @@ class PptAgentEnvironment(Environment):
         self._termination_reason = None
         self._last_score = 0.0
         self._last_action_result = None
+        self._last_reward_details = None
         self._scenario = self._resolve_scenario(
             task_id=requested_task_id,
             difficulty=requested_difficulty,
@@ -174,12 +177,21 @@ class PptAgentEnvironment(Environment):
             }
             if execution_result.affected_slide_index is not None:
                 inspection = self._inspection_service.inspect_presentation(self._editor)
-                reward = self._score_intermediate_step(
+                intermediate_result = self._score_intermediate_step(
                     slide_index=execution_result.affected_slide_index,
                     inspection=inspection,
                 )
+                reward = intermediate_result.reward_total
+                self._last_reward_details = {
+                    "kind": "intermediate_slide",
+                    "result": to_serializable(intermediate_result),
+                }
             else:
                 reward = execution_result.reward
+                self._last_reward_details = {
+                    "kind": "action",
+                    "result": {"reward_total": reward},
+                }
             logger.info(
                 "env.step action complete episode_id=%s step=%s action_type=%s reward=%s tool_result=%s",
                 self._state.episode_id,
@@ -192,6 +204,10 @@ class PptAgentEnvironment(Environment):
             invalid_reason = str(error)
             reward = _INVALID_ACTION_PENALTY
             self._last_action_result = None
+            self._last_reward_details = {
+                "kind": "invalid_action",
+                "result": {"reward_total": reward, "error": invalid_reason},
+            }
             logger.warning(
                 "env.step invalid action episode_id=%s step=%s action_type=%s error=%s",
                 self._state.episode_id,
@@ -307,6 +323,7 @@ class PptAgentEnvironment(Environment):
             termination_reason=self._termination_reason,
             done=done,
             reward=reward,
+            metadata={"reward_details": self._last_reward_details or {}},
         )
 
     def _current_task_name(self) -> str:
@@ -430,19 +447,18 @@ class PptAgentEnvironment(Environment):
         *,
         slide_index: int,
         inspection: ExtractedPresentation,
-    ) -> float:
+    ) -> Any:
         if self._eval_spec is None:
             raise RuntimeError("Environment must be reset before scoring")
 
         slide_extraction = inspection.slides[slide_index - 1]
         previous_slide_extractions = inspection.slides[: slide_index - 1] or None
-        result = evaluate_slide(
+        return evaluate_slide(
             self._eval_spec,
             slide_index,
             slide_extraction=slide_extraction,
             previous_slide_extractions=previous_slide_extractions,
         )
-        return result.reward_total
 
     def _should_terminate(self) -> str | None:
         if (
@@ -473,6 +489,10 @@ class PptAgentEnvironment(Environment):
             quantitative_quiz_judge_service=self._quantitative_quiz_judge_service,
         )
         self._last_score = result.reward_total
+        self._last_reward_details = {
+            "kind": "terminal_presentation",
+            "result": to_serializable(result),
+        }
         logger.info(
             "env.finalize complete episode_id=%s reward=%s metadata=%s",
             self._state.episode_id,
