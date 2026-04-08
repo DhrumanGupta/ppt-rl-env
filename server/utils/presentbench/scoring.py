@@ -5,9 +5,11 @@ from typing import Any
 from server.utils.presentbench.metrics import (
     compute_aesthetics_scores,
     compute_presentation_diagnostics,
+    compute_visual_sparsity_penalty,
     mean_scores_by_dimension,
     redundancy_score,
     score_checklist_item,
+    score_generic_slide_checklist_items,
     score_slide_checklist_item,
 )
 from server.utils.reward_metrics import (
@@ -87,6 +89,8 @@ def score_presentbench(
             and diagnostics["min_font_size_pt"] < 10
             else 0.0
         ),
+        "visual_sparsity": penalty_config["visual_sparsity"]
+        * diagnostics["mean_visual_sparsity_penalty"],
     }
     p_soft = sum(soft_penalties.values())
     aesthetic_weight = eval_spec.scoring_config.get("aesthetic_weight", 0.15)
@@ -145,43 +149,24 @@ def score_presentbench_slide(
         slide.slide_index: slide for slide in task_spec.required_slides or []
     }
     target_slide = target_slides.get(slide_index)
+    target_mode = "required_slide" if target_slide is not None else "fallback_generic"
     if target_slide is None:
-        return IntermediateSlideRewardResult(
-            slide_index=slide_index,
-            reward_total=0.0,
-            reward_breakdown={
-                "R_slide": 0.0,
-                "S_prompt_alignment": 0.0,
-                "S_local_completeness": 0.0,
-                "S_local_correctness": 0.0,
-                "S_local_fidelity": 0.0,
-                "S_local_usability": 0.0,
-            },
-            hard_caps={
-                "C_slide_fidelity_critical": 1.0,
-                "C_slide_blankness": 1.0,
-                "C_slide_hard": 1.0,
-            },
-            metadata={
-                "slide_index": slide_index,
-                "spec_hash": eval_spec.spec_hash,
-                "mode": mode,
-                "out_of_range": True,
-            },
+        checklist_results = score_generic_slide_checklist_items(
+            slide_extraction, task_spec
         )
-
-    slide_checklist = eval_spec.slide_checklists.get(slide_index, [])
-    checklist_results = [
-        score_slide_checklist_item(
-            item,
-            slide_extraction,
-            target_slide.slide_role,
-            target_slide.title_hint,
-            target_slide.required_shape_kinds,
-            task_spec,
-        )
-        for item in slide_checklist
-    ]
+    else:
+        slide_checklist = eval_spec.slide_checklists.get(slide_index, [])
+        checklist_results = [
+            score_slide_checklist_item(
+                item,
+                slide_extraction,
+                target_slide.slide_role,
+                target_slide.title_hint,
+                target_slide.required_shape_kinds,
+                task_spec,
+            )
+            for item in slide_checklist
+        ]
     dimension_scores = mean_scores_by_dimension(checklist_results)
 
     s_prompt_alignment = dimension_scores.get("prompt_alignment", 0.0)
@@ -191,11 +176,21 @@ def score_presentbench_slide(
     s_local_usability = dimension_scores.get("local_usability", 0.0)
 
     c_slide_fidelity_critical = (
-        0.5 if (s_local_fidelity < 1.0 and target_slide.required_exact_values) else 1.0
+        0.5
+        if (
+            target_slide is not None
+            and s_local_fidelity < 1.0
+            and target_slide.required_exact_values
+        )
+        else 1.0
     )
     c_slide_blankness = (
         0.4
-        if is_blank_or_title_only(slide_extraction) and target_slide.required_points
+        if is_blank_or_title_only(slide_extraction)
+        and (
+            (target_slide is not None and target_slide.required_points)
+            or target_mode == "fallback_generic"
+        )
         else 1.0
     )
     c_slide_hard = min(c_slide_fidelity_critical, c_slide_blankness)
@@ -204,7 +199,10 @@ def score_presentbench_slide(
     overlap = compute_overlap_ratio(slide_extraction)
     min_font = slide_extraction.text_metrics.get("min_font_size_pt")
     redundancy = redundancy_score(slide_extraction, previous_slide_extractions)
-    wrong_slot_behavior = 0.0 if s_prompt_alignment >= 1.0 else 1.0
+    visual_sparsity = compute_visual_sparsity_penalty(slide_extraction)
+    wrong_slot_behavior = (
+        0.0 if target_mode == "fallback_generic" or s_prompt_alignment >= 1.0 else 1.0
+    )
 
     soft_penalties = {
         "redundancy": penalty_config["redundancy"] * redundancy,
@@ -213,6 +211,8 @@ def score_presentbench_slide(
         "tiny_text": penalty_config["tiny_text"]
         * (1.0 if min_font is not None and min_font < 10 else 0.0),
         "overlap": penalty_config["overlap"] * overlap,
+        "visual_sparsity": penalty_config["visual_sparsity"]
+        * float(visual_sparsity["penalty"]),
     }
     p_slide_soft = sum(soft_penalties.values())
     reward_total = clamp(
@@ -248,11 +248,13 @@ def score_presentbench_slide(
         metadata={
             "slide_index": slide_index,
             "slide_id": slide_extraction.slide_id,
-            "target_slide_role": target_slide.slide_role,
-            "target_title_hint": target_slide.title_hint,
-            "required_points": target_slide.required_points,
+            "target_mode": target_mode,
+            "target_slide_role": target_slide.slide_role if target_slide else None,
+            "target_title_hint": target_slide.title_hint if target_slide else None,
+            "required_points": target_slide.required_points if target_slide else [],
             "judge_call_count": 0,
             "used_previous_slide_context": previous_slide_extractions is not None,
+            "visual_sparsity": visual_sparsity,
             "spec_hash": eval_spec.spec_hash,
             "mode": mode,
         },
