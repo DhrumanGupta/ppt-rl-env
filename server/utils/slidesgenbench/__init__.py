@@ -8,6 +8,10 @@ from server.utils.slidesgenbench.quantitative_judge import (
 )
 from server.utils.slidesgenbench.scoring import score_slidesgenbench
 from server.utils.slidesgenbench.spec_builder import build_slidesgenbench_eval_spec
+from server.utils.slidesgenbench.text_layout import (
+    compute_presentation_text_layout_scores,
+    compute_slide_text_layout_scores,
+)
 
 __all__ = [
     "QuizBankGenerationService",
@@ -15,5 +19,7 @@ __all__ = [
     "QuantitativeQuizJudgeService",
     "SlidesGenQuantitativeJudgeService",
     "build_slidesgenbench_eval_spec",
+    "compute_presentation_text_layout_scores",
+    "compute_slide_text_layout_scores",
     "score_slidesgenbench",
 ]

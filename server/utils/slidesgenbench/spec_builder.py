@@ -14,13 +14,26 @@ from server.utils.slidesgenbench.quizbank_service import QuizBankGenerationServi
 SPEC_VERSION = "1.0"
 
 DEFAULT_SLIDESGENBENCH_SCORING_CONFIG = {
-    "branch_split": {"content": 0.65, "aesthetics": 0.35},
+    "branch_split": {"content": 0.35, "aesthetics": 0.35, "text_layout": 0.30},
     "quiz_split": {"qualitative": 0.5, "quantitative": 0.5},
     "aesthetic_weights": {
         "harmony": 0.20,
         "engagement": 0.20,
         "usability": 0.35,
         "rhythm": 0.25,
+    },
+    "text_layout_weights": {
+        "bounds": 0.40,
+        "density": 0.30,
+        "overlap": 0.30,
+    },
+    "text_layout_config": {
+        "target_words": 80,
+        "hard_max_words": 140,
+        "max_overlap_tolerance_ratio": 0.0,
+        "hard_max_overlap_ratio": 0.15,
+        "clip_hard_cap": 0.05,
+        "overlap_hard_cap": 0.05,
     },
     "harmony_config": {
         "saturation_threshold": 0.1,

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import replace
 import logging
 import re
 from typing import Any, Protocol
@@ -693,11 +694,10 @@ class SlidesGenQuizBankService:
                 template = quantitative_fallbacks[quantitative_index]
                 quantitative_index += 1
             repaired.append(
-                template.model_copy(
-                    update={
-                        "question_id": str(slot["question_id"]),
-                        "question_type": question_type,
-                    }
+                replace(
+                    template,
+                    question_id=str(slot["question_id"]),
+                    question_type=question_type,
                 )
             )
         return repaired

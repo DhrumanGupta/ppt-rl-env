@@ -34,13 +34,21 @@ from server.utils.slidesgenbench.spec_builder import build_slidesgenbench_eval_s
 from server.utils.slidesgenbench.rendered_aesthetics import (
     compute_intermediate_rendered_aesthetics_score,
 )
+from server.utils.slidesgenbench.text_layout import compute_slide_text_layout_scores
 
 SPEC_VERSION = "1.0"
-INTERMEDIATE_SLIDESGENBENCH_AESTHETIC_WEIGHT = 0.25
+INTERMEDIATE_SLIDESGENBENCH_AESTHETIC_WEIGHT = 0.20
+INTERMEDIATE_SLIDESGENBENCH_TEXT_LAYOUT_WEIGHT = 0.35
 
 DEFAULT_REWARD_KERNEL_CONFIG: dict[str, Any] = {
-    "branch_weights": {"presentbench": 0.6, "slidesgenbench": 0.4},
+    "branch_weights": {"presentbench": 0.45, "slidesgenbench": 0.55},
 }
+
+
+def _reward_details_payload(
+    result: RewardResult | IntermediateSlideRewardResult,
+) -> dict[str, Any]:
+    return to_serializable(result)
 
 
 def _write_json(path: Path, payload: Any) -> None:
@@ -310,6 +318,11 @@ def evaluate_slide(
     )
 
     rendered_aesthetics: dict[str, Any] = {}
+    text_layout_scores = compute_slide_text_layout_scores(
+        slide_extraction,
+        config=eval_spec.slidesgenbench.scoring_config.get("text_layout_config"),
+        weights=eval_spec.slidesgenbench.scoring_config.get("text_layout_weights"),
+    )
     render_error: str | None = None
     if (
         presentation is not None
@@ -368,18 +381,31 @@ def evaluate_slide(
             render_error = str(error)
 
     s_slide_aesthetic = float(rendered_aesthetics.get("aesthetic", 0.0))
-    weight = INTERMEDIATE_SLIDESGENBENCH_AESTHETIC_WEIGHT
-    reward_total = clamp(
-        (1.0 - weight) * presentbench_result.reward_total + weight * s_slide_aesthetic
+    s_slide_text_layout = float(text_layout_scores.get("text_layout", 0.0))
+    aesthetic_weight = INTERMEDIATE_SLIDESGENBENCH_AESTHETIC_WEIGHT
+    text_layout_weight = INTERMEDIATE_SLIDESGENBENCH_TEXT_LAYOUT_WEIGHT
+    presentbench_weight = max(0.0, 1.0 - aesthetic_weight - text_layout_weight)
+    reward_pre_cap = (
+        presentbench_weight * presentbench_result.reward_total
+        + aesthetic_weight * s_slide_aesthetic
+        + text_layout_weight * s_slide_text_layout
     )
+    text_layout_hard_cap = float(text_layout_scores.get("hard_cap", 1.0))
+    reward_total = clamp(reward_pre_cap * text_layout_hard_cap)
     reward_breakdown = {
         **presentbench_result.reward_breakdown,
         "R_slide_presentbench": presentbench_result.reward_total,
+        "R_slide_pre_text_layout_cap": reward_pre_cap,
         "S_slide_aesthetic": s_slide_aesthetic,
         "S_slide_harmony": float(rendered_aesthetics.get("harmony", 0.0)),
         "S_slide_engagement": float(rendered_aesthetics.get("engagement", 0.0)),
         "S_slide_usability_rendered": float(rendered_aesthetics.get("usability", 0.0)),
         "S_slide_rhythm": float(rendered_aesthetics.get("rhythm", 0.0)),
+        "S_slide_text_layout": s_slide_text_layout,
+        "S_slide_text_bounds": float(text_layout_scores.get("text_bounds", 0.0)),
+        "S_slide_text_density": float(text_layout_scores.get("text_density", 0.0)),
+        "S_slide_text_overlap": float(text_layout_scores.get("text_overlap", 0.0)),
+        "C_slide_text_layout_hard": text_layout_hard_cap,
         "R_slide": reward_total,
     }
     metadata = {
@@ -387,7 +413,9 @@ def evaluate_slide(
         "render_backend": rendered_aesthetics.get("backend"),
         "render_error": render_error,
         "used_rendered_slide_aesthetics": bool(rendered_aesthetics),
-        "intermediate_slidesgenbench_aesthetic_weight": weight,
+        "intermediate_slidesgenbench_aesthetic_weight": aesthetic_weight,
+        "intermediate_slidesgenbench_text_layout_weight": text_layout_weight,
+        "text_layout": text_layout_scores,
     }
     return IntermediateSlideRewardResult(
         slide_index=presentbench_result.slide_index,

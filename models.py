@@ -48,3 +48,7 @@ class PptAgentObservation(Observation):
         default=None,
         description="Episode termination reason when done is true",
     )
+    metadata: dict[str, Any] = Field(
+        default_factory=dict,
+        description="Additional debug and reward metadata for the last step",
+    )
