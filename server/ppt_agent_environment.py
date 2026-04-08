@@ -102,6 +102,7 @@ class PptAgentEnvironment(Environment):
         self._last_score = 0.0
         self._last_action_result: dict[str, Any] | None = None
         self._last_reward_details: dict[str, Any] | None = None
+        self._known_named_shapes_by_slide: dict[int, dict[str, int]] = {}
 
     def reset(
         self,
@@ -132,6 +133,7 @@ class PptAgentEnvironment(Environment):
             self._last_score = 0.0
             self._last_action_result = None
             self._last_reward_details = None
+            self._known_named_shapes_by_slide = {}
             self._scenario = self._resolve_scenario(
                 task_id=requested_task_id,
                 difficulty=requested_difficulty,
@@ -213,8 +215,10 @@ class PptAgentEnvironment(Environment):
 
             try:
                 execution_result = self._execute_action(action)
+                self._update_known_named_shapes(action, execution_result)
                 self._last_action_result = {
                     "action_type": execution_result.action_type,
+                    "slide_index": self._result_slide_index(action, execution_result),
                     "tool_result": execution_result.tool_result,
                 }
                 write_debug_event(
@@ -421,6 +425,14 @@ class PptAgentEnvironment(Environment):
             metadata={
                 "reward_details": self._last_reward_details or {},
                 "current_theme": self._editor.get_theme(),
+                "known_named_shapes_by_slide": {
+                    slide_index: dict(named_shapes)
+                    for slide_index, named_shapes in self._known_named_shapes_by_slide.items()
+                },
+                "slide_constraints": self._slide_constraints(),
+                "default_save_path": self._default_output_path(),
+                "max_steps": self._max_steps,
+                "step_count": self._state.step_count,
             },
         )
 
@@ -560,6 +572,78 @@ class PptAgentEnvironment(Environment):
         task_name = self._current_task_name() or "presentation"
         episode_id = self._state.episode_id or str(uuid4())
         return str(Path("outputs") / f"{task_name}_{episode_id}.pptx")
+
+    def _slide_constraints(self) -> dict[str, int]:
+        if self._eval_spec is None:
+            return {}
+        task_spec = self._eval_spec.task_spec
+        constraints: dict[str, int] = {}
+        if isinstance(task_spec.min_slides, int):
+            constraints["min_slides"] = task_spec.min_slides
+        if isinstance(task_spec.max_slides, int):
+            constraints["max_slides"] = task_spec.max_slides
+        return constraints
+
+    def _result_slide_index(
+        self, action: PptAgentAction, execution_result: _ActionExecutionResult
+    ) -> int | None:
+        if execution_result.action_type == "create_slide":
+            return execution_result.affected_slide_index
+        return action.slide_index
+
+    def _update_known_named_shapes(
+        self, action: PptAgentAction, execution_result: _ActionExecutionResult
+    ) -> None:
+        tool_result = execution_result.tool_result
+        named_shapes = tool_result.get("named_shapes")
+        normalized_named_shapes = {
+            name: shape_id
+            for name, shape_id in (named_shapes or {}).items()
+            if isinstance(name, str) and isinstance(shape_id, int)
+        }
+
+        if execution_result.action_type == "create_slide":
+            slide_index = execution_result.affected_slide_index
+            if isinstance(slide_index, int):
+                self._known_named_shapes_by_slide[slide_index] = dict(
+                    normalized_named_shapes
+                )
+            return
+
+        if execution_result.action_type == "update_slide":
+            slide_index = action.slide_index
+            if not isinstance(slide_index, int):
+                return
+            current = dict(self._known_named_shapes_by_slide.get(slide_index, {}))
+            deleted_shape_ids = {
+                shape_id
+                for shape_id in tool_result.get("deleted_shape_ids") or []
+                if isinstance(shape_id, int)
+            }
+            if deleted_shape_ids:
+                current = {
+                    name: shape_id
+                    for name, shape_id in current.items()
+                    if shape_id not in deleted_shape_ids
+                }
+            current.update(normalized_named_shapes)
+            self._known_named_shapes_by_slide[slide_index] = current
+            return
+
+        if execution_result.action_type == "delete_slide":
+            slide_index = action.slide_index
+            if not isinstance(slide_index, int):
+                return
+            reindexed: dict[int, dict[str, int]] = {}
+            for (
+                existing_index,
+                existing_shapes,
+            ) in self._known_named_shapes_by_slide.items():
+                if existing_index < slide_index:
+                    reindexed[existing_index] = existing_shapes
+                elif existing_index > slide_index:
+                    reindexed[existing_index - 1] = existing_shapes
+            self._known_named_shapes_by_slide = reindexed
 
     def _score_intermediate_step(
         self,

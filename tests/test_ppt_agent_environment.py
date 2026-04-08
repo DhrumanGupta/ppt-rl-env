@@ -242,6 +242,21 @@ def test_update_slide_returns_tool_metadata_for_agent_followup() -> None:
         update_result["tool_result"]["named_shapes"]["summary"]
         in update_result["tool_result"]["created_shape_ids"]
     )
+    assert (
+        observation.metadata["known_named_shapes_by_slide"][1]["title"]
+        == created["named_shapes"]["title"]
+    )
+    assert "summary" in observation.metadata["known_named_shapes_by_slide"][1]
+    assert isinstance(observation.metadata["slide_constraints"]["min_slides"], int)
+    assert isinstance(observation.metadata["slide_constraints"]["max_slides"], int)
+    assert (
+        observation.metadata["slide_constraints"]["min_slides"]
+        <= observation.metadata["slide_constraints"]["max_slides"]
+    )
+    assert observation.metadata["max_steps"] == 5
+    assert observation.metadata["step_count"] == 2
+    assert observation.metadata["default_save_path"].endswith(".pptx")
+    assert observation.last_action_result["slide_index"] == 1
 
 
 def test_delete_slide_returns_zero_reward_and_deletes_slide() -> None:

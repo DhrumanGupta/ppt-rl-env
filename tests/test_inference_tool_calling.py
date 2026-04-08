@@ -6,7 +6,7 @@ import pytest
 from agent_action_tools import parse_tool_invocation, tool_invocation_to_action
 from inference import (
     SYSTEM_PROMPT,
-    _planning_prompt,
+    _planning_payload,
     _validate_tool_choice,
     choose_action,
 )
@@ -23,7 +23,14 @@ def _observation(**overrides):
         "last_action_error": None,
         "last_action_result": None,
         "score": 0.0,
-        "metadata": {"current_theme": {"accent": "#2563EB", "font": "Aptos"}},
+        "metadata": {
+            "current_theme": {"accent": "#2563EB", "font": "Aptos"},
+            "known_named_shapes_by_slide": {},
+            "slide_constraints": {"min_slides": 3, "max_slides": 3},
+            "default_save_path": "outputs/sample_task_episode.pptx",
+            "max_steps": 8,
+            "step_count": 0,
+        },
     }
     payload.update(overrides)
     return SimpleNamespace(**payload)
@@ -138,7 +145,7 @@ def test_parse_tool_invocation_rejects_removed_citation_shape_type():
         )
 
 
-def test_planning_prompt_includes_named_shape_context():
+def test_planning_payload_uses_observation_planning_metadata():
     history = [
         {
             "tool_name": "create_slide",
@@ -159,21 +166,35 @@ def test_planning_prompt_includes_named_shape_context():
         },
     ]
 
-    prompt = json.loads(_planning_prompt(_observation(), history))
+    observation = _observation(
+        metadata={
+            "current_theme": {"accent": "#2563EB", "font": "Aptos"},
+            "known_named_shapes_by_slide": {1: {"title": 11, "body": 13}},
+            "slide_constraints": {"min_slides": 3, "max_slides": 3},
+            "default_save_path": "outputs/sample_task_episode.pptx",
+            "max_steps": 8,
+            "step_count": 2,
+        }
+    )
+
+    prompt = _planning_payload(observation, history)
 
     assert prompt["recent_actions"][0]["tool_name"] == "create_slide"
-    assert prompt["known_named_shapes_by_slide"]["1"] == {"title": 11, "body": 13}
-    assert prompt["requirements"]["supported_tools"] == [
-        "create_slide",
-        "update_slide",
-        "delete_slide",
-        "set_theme",
-        "save_presentation",
-    ]
-    assert prompt["requirements"]["current_theme"] == {
+    assert prompt["known_named_shapes_by_slide"][1] == {"title": 11, "body": 13}
+    assert prompt["current_theme"] == {
         "accent": "#2563EB",
         "font": "Aptos",
     }
+    assert prompt["slide_constraints"] == {
+        "min_slides": 3,
+        "max_slides": 3,
+    }
+    assert prompt["default_save_path"] == "outputs/sample_task_episode.pptx"
+    assert prompt["remaining_steps"] == 6
+    assert "task_name" not in prompt
+    assert "difficulty" not in prompt
+    assert "prompt_summary" not in prompt
+    assert "requirements" not in prompt
 
 
 def test_system_prompt_warns_against_old_macro_dsl_fields():
@@ -273,3 +294,22 @@ def test_choose_action_does_not_retry_after_error():
         choose_action(client, _observation(slide_count=0), [])
 
     assert len(completions.calls) == 1
+
+
+def test_choose_action_requires_structured_tool_calls():
+    class FakeCompletions:
+        def create(self, **kwargs):
+            return SimpleNamespace(
+                choices=[
+                    SimpleNamespace(
+                        message=SimpleNamespace(
+                            tool_calls=[], content='{"tool_name":"create_slide"}'
+                        )
+                    )
+                ]
+            )
+
+    client = SimpleNamespace(chat=SimpleNamespace(completions=FakeCompletions()))
+
+    with pytest.raises(ValueError, match="exactly one tool call"):
+        choose_action(client, _observation(slide_count=0), [])
