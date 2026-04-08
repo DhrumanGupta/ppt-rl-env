@@ -5,7 +5,7 @@ from typing import Any
 from server.utils.presentbench.metrics import (
     compute_aesthetics_scores,
     compute_presentation_diagnostics,
-    compute_visual_sparsity_penalty,
+    compute_slide_staleness_penalty,
     mean_scores_by_dimension,
     redundancy_score,
     score_checklist_item,
@@ -89,8 +89,8 @@ def score_presentbench(
             and diagnostics["min_font_size_pt"] < 10
             else 0.0
         ),
-        "visual_sparsity": penalty_config["visual_sparsity"]
-        * diagnostics["mean_visual_sparsity_penalty"],
+        "staleness": penalty_config["staleness"]
+        * diagnostics["mean_staleness_penalty"],
     }
     p_soft = sum(soft_penalties.values())
     aesthetic_weight = eval_spec.scoring_config.get("aesthetic_weight", 0.15)
@@ -199,7 +199,10 @@ def score_presentbench_slide(
     overlap = compute_overlap_ratio(slide_extraction)
     min_font = slide_extraction.text_metrics.get("min_font_size_pt")
     redundancy = redundancy_score(slide_extraction, previous_slide_extractions)
-    visual_sparsity = compute_visual_sparsity_penalty(slide_extraction)
+    staleness = compute_slide_staleness_penalty(
+        slide_extraction,
+        role=target_slide.slide_role if target_slide is not None else None,
+    )
     wrong_slot_behavior = (
         0.0 if target_mode == "fallback_generic" or s_prompt_alignment >= 1.0 else 1.0
     )
@@ -211,8 +214,7 @@ def score_presentbench_slide(
         "tiny_text": penalty_config["tiny_text"]
         * (1.0 if min_font is not None and min_font < 10 else 0.0),
         "overlap": penalty_config["overlap"] * overlap,
-        "visual_sparsity": penalty_config["visual_sparsity"]
-        * float(visual_sparsity["penalty"]),
+        "staleness": penalty_config["staleness"] * float(staleness["penalty"]),
     }
     p_slide_soft = sum(soft_penalties.values())
     reward_total = clamp(
@@ -254,7 +256,7 @@ def score_presentbench_slide(
             "required_points": target_slide.required_points if target_slide else [],
             "judge_call_count": 0,
             "used_previous_slide_context": previous_slide_extractions is not None,
-            "visual_sparsity": visual_sparsity,
+            "staleness": staleness,
             "spec_hash": eval_spec.spec_hash,
             "mode": mode,
         },

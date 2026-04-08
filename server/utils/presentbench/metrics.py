@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections import defaultdict
+from statistics import median
 from typing import Any
 
 from server.utils.reward_metrics import (
@@ -16,15 +17,153 @@ from server.utils.reward_metrics import (
 from server.utils.reward_models import (
     ChecklistItem,
     ExtractedPresentation,
+    ExtractedShape,
     ExtractedSlide,
     TaskSpec,
 )
+
+_TEXTUAL_SHAPE_KINDS = {"text", "citation"}
+_MINIMAL_STALENESS_ROLES = {"title", "agenda"}
+_MODERATE_STALENESS_ROLES = {"summary", "conclusion"}
+_STALENESS_ROLE_PROFILES = {
+    "minimal": {
+        "target_occupied_area_ratio": 0.06,
+        "target_body_word_count": 4,
+        "target_shape_count": 2,
+        "target_visual_anchor_count": 0,
+        "minimum_title_font_pt": 24.0,
+        "role_weights": {
+            "structural_thinness": 0.35,
+            "hierarchy_weakness": 0.40,
+            "visual_flatness": 0.25,
+        },
+    },
+    "moderate": {
+        "target_occupied_area_ratio": 0.10,
+        "target_body_word_count": 10,
+        "target_shape_count": 3,
+        "target_visual_anchor_count": 1,
+        "minimum_title_font_pt": 24.0,
+        "role_weights": {
+            "structural_thinness": 0.40,
+            "hierarchy_weakness": 0.30,
+            "visual_flatness": 0.30,
+        },
+    },
+    "standard": {
+        "target_occupied_area_ratio": 0.14,
+        "target_body_word_count": 18,
+        "target_shape_count": 4,
+        "target_visual_anchor_count": 1,
+        "minimum_title_font_pt": 24.0,
+        "role_weights": {
+            "structural_thinness": 0.40,
+            "hierarchy_weakness": 0.25,
+            "visual_flatness": 0.35,
+        },
+    },
+}
+
+
+def _staleness_profile(role: str | None) -> tuple[str, dict[str, Any]]:
+    normalized_role = normalize_text(role)
+    if normalized_role in _MINIMAL_STALENESS_ROLES:
+        return "minimal", _STALENESS_ROLE_PROFILES["minimal"]
+    if normalized_role in _MODERATE_STALENESS_ROLES:
+        return "moderate", _STALENESS_ROLE_PROFILES["moderate"]
+    return "standard", _STALENESS_ROLE_PROFILES["standard"]
+
+
+def _text_shapes(slide: ExtractedSlide) -> list[ExtractedShape]:
+    return [
+        shape
+        for shape in slide.shapes
+        if shape.shape_kind in _TEXTUAL_SHAPE_KINDS and (shape.raw_text or "").strip()
+    ]
+
+
+def _shape_word_count(shape: ExtractedShape | None) -> int:
+    if shape is None or not shape.raw_text:
+        return 0
+    return len([token for token in shape.raw_text.split() if token.strip()])
+
+
+def _shape_font_sizes(shape: ExtractedShape) -> list[float]:
+    return [
+        float(size)
+        for block in shape.text_blocks
+        for size in block.font_sizes_pt
+        if size is not None and size > 0
+    ]
+
+
+def _shape_max_font_size(shape: ExtractedShape | None) -> float | None:
+    if shape is None:
+        return None
+    font_sizes = _shape_font_sizes(shape)
+    return max(font_sizes) if font_sizes else None
+
+
+def _shape_text_colors(shape: ExtractedShape) -> set[str]:
+    return {
+        color.strip().upper()
+        for block in shape.text_blocks
+        for color in block.color_hexes
+        if color
+    }
+
+
+def _shape_has_emphasis(shape: ExtractedShape) -> bool:
+    for block in shape.text_blocks:
+        if any(flag for flag in block.bold_flags if flag is not None):
+            return True
+        if any(flag for flag in block.italic_flags if flag is not None):
+            return True
+    return False
+
+
+def _title_shape(
+    slide: ExtractedSlide, text_shapes: list[ExtractedShape]
+) -> ExtractedShape | None:
+    if not text_shapes:
+        return None
+    title_text = normalize_text(slide.title_text)
+    if title_text:
+        title_matches = [
+            shape
+            for shape in text_shapes
+            if normalize_text(shape.raw_text) == title_text
+        ]
+        if title_matches:
+            return min(title_matches, key=lambda shape: (shape.y, shape.x))
+    return min(text_shapes, key=lambda shape: (shape.y, shape.x))
+
+
+def _slide_role_map(task_spec: TaskSpec) -> dict[int, str]:
+    return {
+        slide.slide_index: slide.slide_role for slide in task_spec.required_slides or []
+    }
+
+
+def _background_richness_score(background_rgb: tuple[int, int, int] | None) -> float:
+    if background_rgb is None:
+        return 0.5
+    channel_spread = max(background_rgb) - min(background_rgb)
+    mean_channel = sum(background_rgb) / 3.0
+    if mean_channel >= 250.0 and channel_spread <= 4:
+        return 0.0
+    if mean_channel >= 242.0 and channel_spread <= 10:
+        return 0.25
+    if mean_channel >= 230.0 and channel_spread <= 18:
+        return 0.5
+    return 1.0
 
 
 def compute_presentation_diagnostics(
     extraction: ExtractedPresentation,
     task_spec: TaskSpec,
 ) -> dict[str, Any]:
+    role_map = _slide_role_map(task_spec)
     min_font_sizes = [
         slide.text_metrics.get("min_font_size_pt")
         for slide in extraction.slides
@@ -32,8 +171,12 @@ def compute_presentation_diagnostics(
     ]
     overlap_ratios = [compute_overlap_ratio(slide) for slide in extraction.slides]
     blank_count = sum(1 for slide in extraction.slides if is_blank_or_title_only(slide))
-    visual_sparsity = [
-        compute_visual_sparsity_penalty(slide)["penalty"] for slide in extraction.slides
+    staleness = [
+        compute_slide_staleness_penalty(
+            slide,
+            role=role_map.get(slide.slide_index),
+        )["penalty"]
+        for slide in extraction.slides
     ]
     all_fonts = {
         font
@@ -57,10 +200,10 @@ def compute_presentation_diagnostics(
         else 1.0,
         "min_font_size_pt": min(min_font_sizes) if min_font_sizes else None,
         "max_overlap_ratio": max(overlap_ratios) if overlap_ratios else 0.0,
-        "mean_visual_sparsity_penalty": (
-            sum(visual_sparsity) / len(visual_sparsity) if visual_sparsity else 0.0
+        "mean_staleness_penalty": (
+            sum(staleness) / len(staleness) if staleness else 0.0
         ),
-        "max_visual_sparsity_penalty": max(visual_sparsity) if visual_sparsity else 0.0,
+        "max_staleness_penalty": max(staleness) if staleness else 0.0,
         "unique_font_family_count": len(all_fonts),
     }
 
@@ -283,55 +426,170 @@ def _hex_to_rgb(color_hex: str | None) -> tuple[int, int, int] | None:
         return None
 
 
-def compute_visual_sparsity_penalty(slide: ExtractedSlide) -> dict[str, Any]:
+def compute_slide_staleness_penalty(
+    slide: ExtractedSlide,
+    *,
+    role: str | None = None,
+) -> dict[str, Any]:
+    profile_name, profile = _staleness_profile(role)
+    text_shapes = _text_shapes(slide)
+    title_shape = _title_shape(slide, text_shapes)
+    body_shapes = [
+        shape
+        for shape in text_shapes
+        if title_shape is None or shape.shape_id != title_shape.shape_id
+    ]
+    title_font_size = _shape_max_font_size(title_shape)
+    body_font_sizes = [
+        font_size
+        for shape in body_shapes
+        if (font_size := _shape_max_font_size(shape)) is not None
+    ]
+    body_font_size = float(median(body_font_sizes)) if body_font_sizes else None
+
     occupied_area_ratio = float(slide.layout_metrics.get("occupied_area_ratio", 0.0))
-    text_word_count = len((slide_text_corpus(slide) or "").split())
+    shape_count = len(slide.shapes)
+    total_word_count = len((slide_text_corpus(slide) or "").split())
+    title_word_count = _shape_word_count(title_shape)
+    body_word_count = max(total_word_count - title_word_count, 0)
     non_text_shape_count = sum(
-        1 for shape in slide.shapes if shape.shape_kind not in {"text", "citation"}
+        1 for shape in slide.shapes if shape.shape_kind not in _TEXTUAL_SHAPE_KINDS
     )
     rich_visual_count = (
         int(slide.layout_metrics.get("chart_count", 0))
         + int(slide.layout_metrics.get("table_count", 0))
         + int(slide.layout_metrics.get("image_count", 0))
     )
+    background_rgb = _hex_to_rgb(slide.background_color_hex)
+    background_richness = _background_richness_score(background_rgb)
     palette = slide.color_metrics.get("palette", [])
     palette_size = len(palette)
-    background_rgb = _hex_to_rgb(slide.background_color_hex)
-    plain_light_background = False
-    if background_rgb is not None:
-        plain_light_background = (
-            min(background_rgb) >= 250
-            and (max(background_rgb) - min(background_rgb)) <= 4
+    background_hex = (slide.background_color_hex or "").strip().upper().lstrip("#")
+    filled_shape_count = sum(
+        1
+        for shape in slide.shapes
+        if shape.fill_color_hex
+        and shape.fill_color_hex.strip().upper().lstrip("#") != background_hex
+    )
+    visual_anchor_count = rich_visual_count + filled_shape_count
+    text_color_count = len(
+        {color for shape in text_shapes for color in _shape_text_colors(shape)}
+    )
+    distinct_font_sizes = {
+        round(font_size, 1)
+        for shape in text_shapes
+        for font_size in _shape_font_sizes(shape)
+    }
+    emphasized_shape_count = sum(
+        1 for shape in text_shapes if _shape_has_emphasis(shape)
+    )
+    slide_height_in = float(slide.metadata.get("slide_height_in") or 0.0)
+    title_top_score = 0.4
+    if title_shape is not None and slide_height_in > 0:
+        title_top_score = clamp(
+            1.0 - (title_shape.y / max(slide_height_in * 0.35, 1e-6))
         )
 
-    occupancy_penalty = 1.0 - clamp((occupied_area_ratio - 0.03) / 0.12)
-    text_penalty = 1.0 - clamp((text_word_count - 4.0) / 20.0)
-    non_text_penalty = (
-        0.0 if non_text_shape_count >= 2 else 1.0 - 0.5 * non_text_shape_count
+    occupancy_score = clamp(occupied_area_ratio / profile["target_occupied_area_ratio"])
+    body_content_score = clamp(
+        body_word_count / max(float(profile["target_body_word_count"]), 1.0)
     )
-    palette_penalty = 1.0 if palette_size <= 2 else 0.5 if palette_size == 3 else 0.0
-    plain_background_penalty = 1.0 if plain_light_background else 0.0
+    shape_score = clamp(shape_count / max(float(profile["target_shape_count"]), 1.0))
+    target_anchor_count = float(profile["target_visual_anchor_count"])
+    if target_anchor_count <= 0.0:
+        anchor_score = 1.0 if visual_anchor_count > 0 else 0.7
+    else:
+        anchor_score = clamp(visual_anchor_count / target_anchor_count)
+    structural_strength = clamp(
+        0.35 * occupancy_score
+        + 0.30 * body_content_score
+        + 0.20 * shape_score
+        + 0.15 * anchor_score
+    )
+    if profile_name == "minimal" and title_shape is not None and body_font_size is None:
+        structural_strength = max(
+            structural_strength, 0.75 if shape_count >= 1 else 0.6
+        )
+    structural_thinness = 1.0 - structural_strength
 
-    penalty = clamp(
-        0.25 * occupancy_penalty
-        + 0.15 * text_penalty
-        + 0.10 * non_text_penalty
-        + 0.10 * palette_penalty
-        + 0.40 * plain_background_penalty
+    if title_shape is None:
+        size_contrast_score = 0.3
+    elif body_font_size is None:
+        size_contrast_score = clamp(
+            ((title_font_size or 0.0) - float(profile["minimum_title_font_pt"])) / 8.0
+        )
+        if profile_name == "minimal":
+            size_contrast_score = max(
+                size_contrast_score, 0.85 if title_font_size else 0.5
+            )
+    else:
+        size_gap = (title_font_size or 0.0) - body_font_size
+        size_contrast_score = clamp((size_gap - 2.0) / 12.0)
+    font_size_variety = clamp((len(distinct_font_sizes) - 1) / 2.0)
+    text_color_variety = clamp((text_color_count - 1) / 2.0)
+    style_variety_score = clamp(0.65 * font_size_variety + 0.35 * text_color_variety)
+    if profile_name == "minimal" and body_font_size is None and title_font_size:
+        style_variety_score = max(
+            style_variety_score,
+            clamp((title_font_size - float(profile["minimum_title_font_pt"])) / 6.0),
+        )
+    emphasis_score = clamp(
+        0.60 * min(emphasized_shape_count, 1) + 0.40 * min(filled_shape_count, 1)
     )
-    if rich_visual_count > 0:
-        penalty = clamp(penalty - 0.20)
-    elif non_text_shape_count > 0 and not plain_light_background:
-        penalty = clamp(penalty - 0.15)
+    hierarchy_strength = clamp(
+        0.45 * size_contrast_score
+        + 0.25 * title_top_score
+        + 0.15 * style_variety_score
+        + 0.15 * emphasis_score
+    )
+    if profile_name == "minimal" and title_shape is not None and body_font_size is None:
+        hierarchy_strength = max(hierarchy_strength, 0.75)
+    hierarchy_weakness = 1.0 - hierarchy_strength
+
+    palette_richness = clamp((palette_size - 2) / 3.0)
+    text_color_richness = clamp((text_color_count - 1) / 2.0)
+    anchor_richness = clamp(visual_anchor_count / 1.0)
+    visual_energy = clamp(
+        0.40 * anchor_richness
+        + 0.25 * palette_richness
+        + 0.20 * text_color_richness
+        + 0.15 * background_richness
+    )
+    if profile_name == "minimal" and title_shape is not None and body_font_size is None:
+        visual_energy = max(visual_energy, 0.45 + 0.20 * background_richness)
+    visual_flatness = 1.0 - visual_energy
+
+    role_weights = profile["role_weights"]
+    penalty = clamp(
+        role_weights["structural_thinness"] * structural_thinness
+        + role_weights["hierarchy_weakness"] * hierarchy_weakness
+        + role_weights["visual_flatness"] * visual_flatness
+    )
 
     return {
         "penalty": penalty,
+        "role": role,
+        "role_profile": profile_name,
+        "structural_thinness": structural_thinness,
+        "hierarchy_weakness": hierarchy_weakness,
+        "visual_flatness": visual_flatness,
         "occupied_area_ratio": occupied_area_ratio,
-        "text_word_count": text_word_count,
+        "shape_count": shape_count,
+        "body_word_count": body_word_count,
         "non_text_shape_count": non_text_shape_count,
         "rich_visual_count": rich_visual_count,
+        "filled_shape_count": filled_shape_count,
+        "visual_anchor_count": visual_anchor_count,
         "palette_size": palette_size,
-        "plain_light_background": plain_light_background,
+        "text_color_count": text_color_count,
+        "background_richness": background_richness,
+        "plain_light_background": background_richness == 0.0,
+        "title_font_size_pt": title_font_size,
+        "body_font_size_pt": body_font_size,
+        "title_top_score": title_top_score,
+        "size_contrast_score": size_contrast_score,
+        "style_variety_score": style_variety_score,
+        "emphasis_score": emphasis_score,
     }
 
 
@@ -475,9 +733,9 @@ def redundancy_score(
 
 
 __all__ = [
-    "compute_visual_sparsity_penalty",
     "compute_aesthetics_scores",
     "compute_presentation_diagnostics",
+    "compute_slide_staleness_penalty",
     "mean_scores_by_dimension",
     "redundancy_score",
     "score_checklist_item",
