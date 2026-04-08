@@ -39,11 +39,9 @@ HF_TOKEN = os.getenv("HF_TOKEN")
 
 API_BASE_URL = os.getenv("API_BASE_URL", "https://router.huggingface.co/v1")
 MODEL_NAME = os.getenv("MODEL_NAME", "Qwen/Qwen3.5-27B")
-ENV_BASE_URL = os.getenv("ENV_BASE_URL", "http://localhost:8000")
-TASK_DIFFICULTY = os.getenv("TASK_DIFFICULTY", "hard")
-MAX_STEPS = int(os.getenv("MAX_STEPS", "20"))
-TEMPERATURE = float(os.getenv("TEMPERATURE", "0.1"))
-MAX_TOKENS = int(os.getenv("MAX_TOKENS", "8192"))
+ENV_BASE_URL = "http://localhost:8000"
+TEMPERATURE = 0.0
+TASKS = [("easy", 10), ("medium", 15), ("hard", 20)]
 
 BENCHMARK = "ppt_agent"
 
@@ -245,13 +243,19 @@ def _observation_metadata(observation: Any) -> dict[str, Any]:
 
 
 def _planning_payload(
-    observation: Any, history: list[dict[str, Any]]
+    observation: Any, history: list[dict[str, Any]], max_steps: int
 ) -> dict[str, Any]:
     metadata = _observation_metadata(observation)
     current_theme = metadata.get("current_theme")
     known_named_shapes = metadata.get("known_named_shapes_by_slide")
     slide_constraints = metadata.get("slide_constraints")
     default_save_path = metadata.get("default_save_path")
+    metadata_max_steps = metadata.get("max_steps")
+    effective_max_steps = (
+        min(metadata_max_steps, max_steps)
+        if isinstance(metadata_max_steps, int)
+        else max_steps
+    )
 
     return {
         "task_prompt": observation.task_prompt,
@@ -259,8 +263,7 @@ def _planning_payload(
         "slide_count": observation.slide_count,
         "remaining_steps": max(
             0,
-            int(metadata.get("max_steps", MAX_STEPS))
-            - int(metadata.get("step_count", 0)),
+            effective_max_steps - int(metadata.get("step_count", 0)),
         ),
         "last_action_error": observation.last_action_error,
         "last_action_result": observation.last_action_result,
@@ -305,9 +308,11 @@ def _validate_tool_choice(invocation: AgentToolInvocation, observation: Any) -> 
 def _extract_tool_invocation(
     message: Any,
 ) -> tuple[AgentToolInvocation, dict[str, Any]]:
-    tool_calls = getattr(message, "tool_calls", None) or []
-    if len(tool_calls) != 1:
-        raise ValueError("LLM must emit exactly one tool call")
+    raw_tool_calls = getattr(message, "tool_calls", None) or []
+    tool_calls = list(raw_tool_calls)
+    if not tool_calls:
+        raise ValueError("LLM must emit at least one tool call")
+
     tool_call = tool_calls[0]
     function = getattr(tool_call, "function", None)
     tool_name = getattr(function, "name", None)
@@ -316,7 +321,11 @@ def _extract_tool_invocation(
         raise ValueError("Tool call missing function name")
     return (
         parse_tool_invocation(tool_name, arguments),
-        {"tool_name": tool_name, "arguments": arguments},
+        {
+            "tool_name": tool_name,
+            "arguments": arguments,
+            "ignored_tool_calls": max(0, len(tool_calls) - 1),
+        },
     )
 
 
@@ -362,7 +371,7 @@ def _message_debug_payload(message: Any) -> dict[str, Any]:
 
 
 def choose_action(
-    client: OpenAI, observation: Any, history: list[dict[str, Any]]
+    client: OpenAI, observation: Any, history: list[dict[str, Any]], max_steps: int
 ) -> tuple[PptAgentAction, str, AgentToolInvocation]:
     metadata = _observation_metadata(observation)
     messages = [
@@ -370,7 +379,7 @@ def choose_action(
         {
             "role": "user",
             "content": json.dumps(
-                _planning_payload(observation, history),
+                _planning_payload(observation, history, max_steps),
                 separators=(",", ":"),
             ),
         },
@@ -381,7 +390,7 @@ def choose_action(
         "model": MODEL_NAME,
         "base_url": API_BASE_URL,
         "temperature": TEMPERATURE,
-        "max_tokens": MAX_TOKENS,
+        "max_tokens": 8192,
         "tool_choice": "required",
         "messages": messages,
         "tools": OPENAI_TOOLS,
@@ -395,7 +404,7 @@ def choose_action(
             model=MODEL_NAME,
             messages=messages,
             temperature=TEMPERATURE,
-            max_tokens=MAX_TOKENS,
+            max_tokens=8192,
             tools=OPENAI_TOOLS,
             tool_choice="required",
         )
@@ -454,7 +463,7 @@ def choose_action(
         raise
 
 
-async def main() -> None:
+async def run_task(difficulty: str, max_steps: int) -> None:
     if HF_TOKEN is None:
         raise ValueError("HF_TOKEN environment variable is required")
 
@@ -468,7 +477,7 @@ async def main() -> None:
 
     try:
         async with PptAgentEnv(base_url=ENV_BASE_URL, message_timeout_s=180.0) as env:
-            result = await env.reset(difficulty=TASK_DIFFICULTY)
+            result = await env.reset(difficulty=difficulty)
             observation = result.observation
             log_start(
                 task=observation.task_name or "unknown",
@@ -477,7 +486,7 @@ async def main() -> None:
             )
             started = True
 
-            for step in range(1, MAX_STEPS + 1):
+            for step in range(1, max_steps + 1):
                 if result.done:
                     break
                 # choose_action performs a synchronous model request. Keep it off
@@ -487,6 +496,7 @@ async def main() -> None:
                     client,
                     observation,
                     history,
+                    max_steps,
                 )
                 result = await env.step(action)
                 observation = result.observation
@@ -505,15 +515,8 @@ async def main() -> None:
                     break
             else:
                 print(
-                    f"[DEBUG] reached max steps {MAX_STEPS} without completion",
+                    f"[DEBUG] reached max steps {max_steps} without completion",
                     flush=True,
-                )
-                # Save the presentation in case it is partially complete and we can get a score for it
-                await env.step(
-                    PptAgentAction(
-                        action_type="save_presentation",
-                        payload={"path": _FALLBACK_SAVE_PATH},
-                    )
                 )
 
             success = bool(
@@ -528,6 +531,11 @@ async def main() -> None:
         success = False
     finally:
         log_end(success=success, steps=steps_taken, score=score, rewards=rewards)
+
+
+async def main() -> None:
+    for difficulty, max_steps in TASKS:
+        await run_task(difficulty, max_steps)
 
 
 if __name__ == "__main__":
