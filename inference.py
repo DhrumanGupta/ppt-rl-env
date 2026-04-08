@@ -455,9 +455,6 @@ def choose_action(
 
 
 async def main() -> None:
-    if HF_TOKEN is None:
-        raise ValueError("HF_TOKEN environment variable is required")
-
     client = OpenAI(base_url=API_BASE_URL, api_key=HF_TOKEN)
     rewards: list[float] = []
     history: list[dict[str, Any]] = []
