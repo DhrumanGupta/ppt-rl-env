@@ -50,9 +50,9 @@ class LLMClient:
                 "https://router.huggingface.co/v1",
             ),
         )
-        api_key = os.environ.get("HF_TOKEN")
+        api_key = os.environ.get("JUDGE_API_KEY")
         if not api_key:
-            raise ValueError("HF_TOKEN must be set")
+            raise ValueError("JUDGE_API_KEY must be set")
 
         self.client = OpenAI(base_url=self.base_url, api_key=api_key)
         logger.info(

@@ -36,4 +36,4 @@ ENV PYTHONPATH="/app:$PYTHONPATH"
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
     CMD curl -f http://localhost:8000/health || exit 1
 
-CMD ["sh", "-c", "printf '[BOOT] cwd=%s\\n' \"$PWD\"; printf '[BOOT] python=%s\\n' \"$(command -v python)\"; printf '[BOOT] uvicorn=%s\\n' \"$(command -v uvicorn)\"; python -c \"import os, sys; print(f'[BOOT] PYTHONPATH={os.getenv(\\\"PYTHONPATH\\\", \\\"\\\")}'); print(f'[BOOT] sys.path entries={len(sys.path)}'); import server.app; print('[BOOT] import server.app OK')\"; exec uvicorn server.app:app --host 0.0.0.0 --port 8000 --log-level info"]
+CMD ["uvicorn", "server.app:app", "--host", "0.0.0.0", "--port", "8000", "--log-level", "info"]
