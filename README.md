@@ -5,7 +5,7 @@ colorFrom: red
 colorTo: indigo
 sdk: docker
 pinned: false
-app_port: 8000
+app_port: 7860
 base_path: /web
 tags:
   - openenv
@@ -35,7 +35,7 @@ The repository is structured to match the benchmark contract:
 Start the environment locally:
 
 ```bash
-uv run --env-file .env uvicorn server.app:app --host 0.0.0.0 --port 8000
+uv run --env-file .env uvicorn server.app:app --host 0.0.0.0 --port 7860
 ```
 
 Run the baseline inference script against the local environment:
@@ -106,6 +106,7 @@ The Space URL will be the ping target for `scripts/validate-submission.sh`.
 ## Environment Details
 
 ### Action
+
 `PptAgentAction` supports these macro actions:
 
 - `create_slide`
@@ -114,6 +115,7 @@ The Space URL will be the ping target for `scripts/validate-submission.sh`.
 - `save_presentation`
 
 ### Observation
+
 `PptAgentObservation` includes:
 
 - `task_name`
@@ -130,6 +132,7 @@ The Space URL will be the ping target for `scripts/validate-submission.sh`.
 - `done`
 
 ### Reward
+
 Intermediate steps receive bounded slide-level reward. Finalization evaluates the full presentation and returns a normalized score in `[0.0, 1.0]`.
 
 ## Tasks
@@ -157,7 +160,7 @@ Connect the client directly to a running environment:
 from client import PptAgentEnv
 from models import PptAgentAction
 
-env = PptAgentEnv(base_url="http://localhost:8000")
+env = PptAgentEnv(base_url="http://localhost:7860")
 
 result = env.reset(difficulty="easy")
 result = env.step(PptAgentAction(action_type="save_presentation", payload={"path": "outputs/demo.pptx"}))
@@ -186,7 +189,7 @@ The validator checks:
 Start the server:
 
 ```bash
-uv run --env-file .env uvicorn server.app:app --host 0.0.0.0 --port 8000
+uv run --env-file .env uvicorn server.app:app --host 0.0.0.0 --port 7860
 ```
 
 Run inference against it:

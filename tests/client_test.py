@@ -160,7 +160,7 @@ def _slide_three_payload() -> dict:
 
 
 async def main() -> None:
-    base_url = os.getenv("ENV_BASE_URL", "http://localhost:8000")
+    base_url = os.getenv("ENV_BASE_URL", "http://localhost:7860")
     env = PptAgentEnv(base_url=base_url, message_timeout_s=180.0)
     await env.connect()
 

@@ -2,7 +2,7 @@ from client import PptAgentEnv
 
 
 def test_client_preserves_observation_metadata() -> None:
-    env = PptAgentEnv(base_url="http://localhost:8000")
+    env = PptAgentEnv(base_url="http://localhost:7860")
     result = env._parse_result(
         {
             "reward": 0.04,
@@ -39,7 +39,7 @@ def test_client_preserves_observation_metadata() -> None:
 
 
 def test_client_preserves_last_action_result_reward_details() -> None:
-    env = PptAgentEnv(base_url="http://localhost:8000")
+    env = PptAgentEnv(base_url="http://localhost:7860")
     result = env._parse_result(
         {
             "reward": 0.04,

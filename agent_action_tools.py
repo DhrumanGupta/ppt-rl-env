@@ -6,10 +6,7 @@ from typing import Annotated, Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
-try:
-    from ppt_agent import PptAgentAction
-except ImportError:  # pragma: no cover
-    from models import PptAgentAction
+from models import PptAgentAction
 
 
 class _StrictModel(BaseModel):
