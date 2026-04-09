@@ -9,7 +9,10 @@ from typing import Any
 from openai import OpenAI
 
 try:
-    from server.debug_logging import debug_enabled, write_debug_event
+    if os.environ.get("DEBUG", "false").lower() == "true":
+        from server.debug_logging import debug_enabled, write_debug_event
+    else:
+        raise ImportError("Debug logging is not enabled")
 except ImportError:  # pragma: no cover
 
     def debug_enabled() -> bool:
@@ -27,13 +30,8 @@ from agent_action_tools import (
     parse_tool_invocation,
     tool_invocation_to_action,
 )
-
-try:
-    from ppt_agent import PptAgentAction, PptAgentEnv
-except ImportError:  # pragma: no cover
-    from client import PptAgentEnv
-    from models import PptAgentAction
-
+from client import PptAgentEnv
+from models import PptAgentAction
 
 HF_TOKEN = os.getenv("HF_TOKEN")
 
