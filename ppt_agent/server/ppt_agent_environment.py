@@ -10,10 +10,12 @@ from uuid import uuid4
 from openenv.core.env_server.interfaces import Environment
 from openenv.core.env_server.types import State
 
-from ..models import PptAgentAction, PptAgentObservation
+from ..models_inside import PptAgentAction, PptAgentObservation
 from .debug_logging import debug_context, write_debug_event
 from .llm_client import LLMClient
-from .task_registry import DEFAULT_TASK_REGISTRY, TaskRegistry, TaskScenario
+from .pptx_extraction import PptxExtractionService
+from .pptx_functions import PptxEditor
+from .pptx_render_service import PptxRenderService
 from .pptx_tools import (
     create_slide,
     delete_slide,
@@ -22,9 +24,6 @@ from .pptx_tools import (
     update_slide,
     update_theme,
 )
-from .pptx_extraction import PptxExtractionService
-from .pptx_functions import PptxEditor
-from .pptx_render_service import PptxRenderService
 from .reward_kernel import build_eval_spec, evaluate_presentation, evaluate_slide
 from .reward_metrics import clamp_reward
 from .reward_models import EvalSpec, ExtractedPresentation, to_serializable
@@ -36,6 +35,7 @@ from .slidesgenbench_quizbank_service import (
     QuizBankGenerationService,
     SlidesGenQuizBankService,
 )
+from .task_registry import DEFAULT_TASK_REGISTRY, TaskRegistry, TaskScenario
 
 _DEFAULT_MAX_STEPS = 30
 _INVALID_ACTION_PENALTY = 0.0

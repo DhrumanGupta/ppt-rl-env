@@ -7,13 +7,13 @@ from typing import Any
 
 from openai import OpenAI
 
-from .agent_action_tools import (
+from .agent_action_tools_inside import (
     AgentToolInvocation,
     build_openai_tools,
     parse_tool_invocation,
     tool_invocation_to_action,
 )
-from .models import PptAgentAction
+from .models_inside import PptAgentAction
 from .server.ppt_agent_environment import PptAgentEnvironment
 
 HF_TOKEN = os.getenv("HF_TOKEN")

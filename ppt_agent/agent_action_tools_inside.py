@@ -6,7 +6,7 @@ from typing import Annotated, Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from .models import PptAgentAction
+from .models_inside import PptAgentAction
 
 
 class _StrictModel(BaseModel):
