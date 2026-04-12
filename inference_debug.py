@@ -24,7 +24,7 @@ except ImportError:  # pragma: no cover
         return None
 
 
-from ppt_agent.agent_action_tools import (
+from agent_action_tools import (
     AgentToolInvocation,
     build_openai_tools,
     parse_tool_invocation,

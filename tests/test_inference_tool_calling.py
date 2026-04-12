@@ -3,7 +3,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from ppt_agent.agent_action_tools import (
+from agent_action_tools import (
     build_openai_tools,
     parse_tool_invocation,
     tool_invocation_to_action,
