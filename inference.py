@@ -12,9 +12,6 @@ try:
 except Exception:  # pragma: no cover
     OpenAI = None
 
-# Direct imports for when running from project root.
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-
 try:
     from ppt_agent.agent_action_tools import (
         AgentToolInvocation,
