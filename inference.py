@@ -398,7 +398,7 @@ async def run_task(difficulty: str, max_steps: int) -> None:
             result = await env.reset(difficulty=difficulty)
             observation = result.observation
             log_start(
-                task=observation.task_name or "unknown",
+                task=difficulty,
                 env=BENCHMARK,
                 model=MODEL_NAME,
             )
