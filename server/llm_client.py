@@ -7,7 +7,16 @@ import re
 
 from openai import OpenAI
 
-from server.debug_logging import write_debug_event
+try:
+    from .debug_logging import write_debug_event
+except ImportError:
+    try:
+        from server.debug_logging import write_debug_event
+    except:
+
+        def write_debug_event(*args, **kwargs) -> None:
+            return None
+
 
 logger = logging.getLogger(__name__)
 

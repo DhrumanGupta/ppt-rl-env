@@ -6,8 +6,10 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Iterable
 
-from server.utils.reward_models import SourceDocument, SourcePack, TaskConstraints
-
+try:
+    from .utils.reward_models import SourceDocument, SourcePack, TaskConstraints
+except ImportError:
+    from server.utils.reward_models import SourceDocument, SourcePack, TaskConstraints
 
 DEFAULT_THEME = {
     "bg": "#F8FAFC",
@@ -108,9 +110,9 @@ def _build_source_document(payload: dict[str, Any]) -> SourceDocument:
         text=str(payload["text"]).strip() if payload.get("text") is not None else None,
         pages=pages,
         images=payload.get("images"),
-        metadata=payload.get("metadata")
-        if isinstance(payload.get("metadata"), dict)
-        else {},
+        metadata=(
+            payload.get("metadata") if isinstance(payload.get("metadata"), dict) else {}
+        ),
     )
 
 
@@ -120,9 +122,11 @@ def _build_task_constraints(payload: dict[str, Any]) -> TaskConstraints:
         max_slides=payload.get("max_slides"),
         target_audience=payload.get("target_audience"),
         tone=payload.get("tone"),
-        extra_constraints=payload.get("extra_constraints")
-        if isinstance(payload.get("extra_constraints"), dict)
-        else {},
+        extra_constraints=(
+            payload.get("extra_constraints")
+            if isinstance(payload.get("extra_constraints"), dict)
+            else {}
+        ),
     )
 
 
