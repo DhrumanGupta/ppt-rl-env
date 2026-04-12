@@ -41,7 +41,7 @@ HF_TOKEN = os.getenv("HF_TOKEN")
 
 API_BASE_URL = os.getenv("API_BASE_URL", "https://router.huggingface.co/v1")
 MODEL_NAME = os.getenv("MODEL_NAME", "Qwen/Qwen3.5-27B")
-ENV_BASE_URL = os.getenv("ENV_BASE_URL", "http://localhost:7860")
+ENV_BASE_URL = os.getenv("ENV_BASE_URL", "https://berlm-ppt-agent.hf.space/")
 TEMPERATURE = 0.0
 TASKS = [("easy", 10), ("medium", 15), ("hard", 20)]
 
