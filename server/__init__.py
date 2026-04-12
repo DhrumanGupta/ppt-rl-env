@@ -6,6 +6,7 @@
 
 """Ppt Agent environment server components."""
 
+from .app import app
 from .ppt_agent_environment import PptAgentEnvironment
 
-__all__ = ["PptAgentEnvironment"]
+__all__ = ["PptAgentEnvironment", "app"]

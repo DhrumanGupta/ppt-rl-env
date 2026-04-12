@@ -2,5 +2,5 @@ spec_version: 1
 name: ppt_agent
 type: space
 runtime: fastapi
-app: server:app
+app: server.app:app
 port: 7860

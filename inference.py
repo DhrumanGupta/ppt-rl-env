@@ -8,15 +8,34 @@ from typing import Any
 
 from openai import OpenAI
 
-from agent_action_tools import (
-    AgentToolInvocation,
-    build_openai_tools,
-    parse_tool_invocation,
-    tool_invocation_to_action,
-)
-from client import PptAgentEnv
-from models import PptAgentAction
-
+try:
+    from agent_action_tools import (
+        AgentToolInvocation,
+        build_openai_tools,
+        parse_tool_invocation,
+        tool_invocation_to_action,
+    )
+    from client import PptAgentEnv
+    from models import PptAgentAction
+except ImportError:
+    try:
+        from ppt_agent.agent_action_tools import (
+            AgentToolInvocation,
+            build_openai_tools,
+            parse_tool_invocation,
+            tool_invocation_to_action,
+        )
+        from ppt_agent.client import PptAgentEnv
+        from ppt_agent.models import PptAgentAction
+    except ImportError:
+        from .agent_action_tools import (
+            AgentToolInvocation,
+            build_openai_tools,
+            parse_tool_invocation,
+            tool_invocation_to_action,
+        )
+        from .client import PptAgentEnv
+        from .models import PptAgentAction
 
 HF_TOKEN = os.getenv("HF_TOKEN")
 
