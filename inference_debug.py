@@ -8,6 +8,22 @@ from typing import Any
 
 from openai import OpenAI
 
+try:
+    if os.environ.get("DEBUG", "false").lower() == "true":
+        from server.debug_logging import debug_enabled, write_debug_event
+    else:
+        raise ImportError("Debug logging is not enabled")
+except ImportError:  # pragma: no cover
+
+    def debug_enabled() -> bool:
+        return False
+
+    def write_debug_event(
+        event_type: str, payload: dict[str, Any] | None = None
+    ) -> None:
+        return None
+
+
 from agent_action_tools import (
     AgentToolInvocation,
     build_openai_tools,
@@ -16,7 +32,6 @@ from agent_action_tools import (
 )
 from client import PptAgentEnv
 from models import PptAgentAction
-
 
 HF_TOKEN = os.getenv("HF_TOKEN")
 
@@ -333,6 +348,26 @@ def _history_entry_from_tool_call(
     }
 
 
+def _message_debug_payload(message: Any) -> dict[str, Any]:
+    tool_calls = getattr(message, "tool_calls", None) or []
+    return {
+        "content": getattr(message, "content", None),
+        "tool_calls": [
+            {
+                "id": getattr(tool_call, "id", None),
+                "type": getattr(tool_call, "type", None),
+                "function": {
+                    "name": getattr(getattr(tool_call, "function", None), "name", None),
+                    "arguments": getattr(
+                        getattr(tool_call, "function", None), "arguments", None
+                    ),
+                },
+            }
+            for tool_call in tool_calls
+        ],
+    }
+
+
 def choose_action(
     client: OpenAI, observation: Any, history: list[dict[str, Any]], max_steps: int
 ) -> tuple[PptAgentAction, str, AgentToolInvocation]:
@@ -348,6 +383,20 @@ def choose_action(
         },
     ]
     raw_response: dict[str, Any] | None = None
+    request_payload = {
+        "stage": "chat.tools",
+        "model": MODEL_NAME,
+        "base_url": API_BASE_URL,
+        "temperature": TEMPERATURE,
+        "max_tokens": 8192,
+        "tool_choice": "required",
+        "messages": messages,
+        "tools": OPENAI_TOOLS,
+    }
+
+    if debug_enabled():
+        write_debug_event("llm.request", request_payload)
+
     try:
         completion = client.chat.completions.create(
             model=MODEL_NAME,
@@ -358,6 +407,15 @@ def choose_action(
             tool_choice="required",
         )
         message = completion.choices[0].message
+        if debug_enabled():
+            write_debug_event(
+                "llm.response",
+                {
+                    "stage": "chat.tools",
+                    "model": MODEL_NAME,
+                    "message": _message_debug_payload(message),
+                },
+            )
         invocation, raw_response = _extract_tool_invocation(message)
         _validate_tool_choice(invocation, observation)
         action = tool_invocation_to_action(
@@ -381,7 +439,26 @@ def choose_action(
             invocation,
         )
     except Exception as error:
-        pass
+        if debug_enabled():
+            write_debug_event(
+                "llm.error",
+                {
+                    "stage": "chat.tools",
+                    "model": MODEL_NAME,
+                    "base_url": API_BASE_URL,
+                    "error_type": type(error).__name__,
+                    "error": str(error),
+                    "response": raw_response,
+                },
+            )
+        print(f"[DEBUG] choose_action failed: {error}", flush=True)
+        if raw_response is not None:
+            print(
+                "[DEBUG] choose_action response="
+                + json.dumps(raw_response, separators=(",", ":")),
+                flush=True,
+            )
+        raise
 
 
 async def run_task(difficulty: str, max_steps: int) -> None:
@@ -431,6 +508,11 @@ async def run_task(difficulty: str, max_steps: int) -> None:
                 )
                 if result.done:
                     break
+            else:
+                print(
+                    f"[DEBUG] reached max steps {max_steps} without completion",
+                    flush=True,
+                )
 
             success = bool(
                 started
@@ -439,8 +521,8 @@ async def run_task(difficulty: str, max_steps: int) -> None:
                 and observation.score > 0.0
             )
             score = float(observation.score or 0.0)
-
     except Exception as error:
+        print(f"[DEBUG] inference failed: {error}", flush=True)
         success = False
     finally:
         log_end(success=success, steps=steps_taken, score=score, rewards=rewards)
