@@ -14,7 +14,7 @@ from .presentbench.scoring import (
 )
 from .presentbench.spec_builder import build_presentbench_eval_spec
 from .pptx_extraction import PptxExtractionService
-from .reward_metrics import clamp
+from .reward_metrics import clamp_reward
 from .reward_models import (
     EvalSpec,
     IntermediateSlideRewardResult,
@@ -200,7 +200,7 @@ def evaluate_presentation(
     )
 
     branch_weights = eval_spec.scoring_config["branch_weights"]
-    reward_total = clamp(
+    reward_total = clamp_reward(
         branch_weights["presentbench"] * presentbench_result.reward_total
         + branch_weights["slidesgenbench"] * slidesgenbench_result.reward_total
     )
@@ -285,7 +285,7 @@ def evaluate_slide(
     except Exception as error:
         return IntermediateSlideRewardResult(
             slide_index=slide_index,
-            reward_total=0.0,
+            reward_total=clamp_reward(0.0),
             reward_breakdown={
                 "R_slide": 0.0,
                 "S_prompt_alignment": 0.0,
@@ -391,7 +391,7 @@ def evaluate_slide(
         + text_layout_weight * s_slide_text_layout
     )
     text_layout_hard_cap = float(text_layout_scores.get("hard_cap", 1.0))
-    reward_total = clamp(reward_pre_cap * text_layout_hard_cap)
+    reward_total = clamp_reward(reward_pre_cap * text_layout_hard_cap)
     reward_breakdown = {
         **presentbench_result.reward_breakdown,
         "R_slide_presentbench": presentbench_result.reward_total,

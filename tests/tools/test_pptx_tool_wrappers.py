@@ -2,7 +2,7 @@ import pytest
 from pptx.enum.dml import MSO_FILL
 from pptx import Presentation
 
-from server.tools.pptx_tools import (
+from ppt_agent.server.tools.pptx_tools import (
     create_presentation,
     create_slide,
     delete_slide,

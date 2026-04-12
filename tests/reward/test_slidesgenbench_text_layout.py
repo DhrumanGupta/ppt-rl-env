@@ -1,10 +1,10 @@
 from __future__ import annotations
 
-from server.utils.pptx_extraction import PptxExtractionService
-from server.utils.pptx_functions import PptxEditor
-from server.utils.reward_kernel import compute_intermediate_slide_reward
-from server.utils.reward_models import SourceDocument, SourcePack
-from server.utils.slidesgenbench.text_layout import (
+from ppt_agent.server.utils.pptx_extraction import PptxExtractionService
+from ppt_agent.server.utils.pptx_functions import PptxEditor
+from ppt_agent.server.utils.reward_kernel import compute_intermediate_slide_reward
+from ppt_agent.server.utils.reward_models import SourceDocument, SourcePack
+from ppt_agent.server.utils.slidesgenbench.text_layout import (
     compute_presentation_text_layout_scores,
     compute_slide_text_layout_scores,
 )

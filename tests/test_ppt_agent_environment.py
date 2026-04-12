@@ -2,11 +2,11 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from models import PptAgentAction
+from ppt_agent.models import PptAgentAction
 
-from server.ppt_agent_environment import PptAgentEnvironment
-from server.task_registry import DEFAULT_TASK_REGISTRY, TaskRegistry
-from server.utils.reward_kernel import evaluate_presentation, evaluate_slide
+from ppt_agent.server.ppt_agent_environment import PptAgentEnvironment
+from ppt_agent.server.task_registry import DEFAULT_TASK_REGISTRY, TaskRegistry
+from ppt_agent.server.utils.reward_kernel import evaluate_presentation, evaluate_slide
 from tests.reward.quizbank_test_utils import (
     DeterministicQuantitativeJudgeService,
     make_quizbank_service,

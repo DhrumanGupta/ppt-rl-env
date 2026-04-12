@@ -3,14 +3,14 @@ from pathlib import Path
 import numpy as np
 from PIL import Image
 
-from server.utils.pptx_functions import PptxEditor
-from server.utils.reward_models import (
+from ppt_agent.server.utils.pptx_functions import PptxEditor
+from ppt_agent.server.utils.reward_models import (
     ExtractedPresentation,
     ExtractedSlide,
     RenderedPresentation,
     RenderedSlideImage,
 )
-from server.utils.slidesgenbench.rendered_aesthetics import (
+from ppt_agent.server.utils.slidesgenbench.rendered_aesthetics import (
     compute_rendered_aesthetics_scores,
 )
 

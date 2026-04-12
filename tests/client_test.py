@@ -4,8 +4,8 @@ import asyncio
 import os
 from pathlib import Path
 
-from client import PptAgentEnv
-from models import PptAgentAction
+from ppt_agent.client import PptAgentEnv
+from ppt_agent.models import PptAgentAction
 
 
 def _print_step(label: str, result) -> None:

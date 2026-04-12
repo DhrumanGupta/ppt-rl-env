@@ -22,6 +22,10 @@ def clamp(value: float, low: float = 0.0, high: float = 1.0) -> float:
     return max(low, min(high, value))
 
 
+def clamp_reward(reward: float) -> float:
+    return clamp(reward, 0.01, 0.99)
+
+
 def normalize_text(text: str | None) -> str:
     if not text:
         return ""

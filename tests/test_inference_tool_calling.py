@@ -3,12 +3,12 @@ from types import SimpleNamespace
 
 import pytest
 
-from agent_action_tools import (
+from ppt_agent.agent_action_tools import (
     build_openai_tools,
     parse_tool_invocation,
     tool_invocation_to_action,
 )
-from inference import (
+from ppt_agent.inference import (
     SYSTEM_PROMPT,
     _planning_payload,
     _validate_tool_choice,

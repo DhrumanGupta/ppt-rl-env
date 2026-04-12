@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-from server.task_registry import DEFAULT_TASK_REGISTRY
-from server.utils.reward_prompts import build_task_spec
-from server.utils.slidesgenbench.prompts import build_quiz_source_context
+from ppt_agent.server.task_registry import DEFAULT_TASK_REGISTRY
+from ppt_agent.server.utils.reward_prompts import build_task_spec
+from ppt_agent.server.utils.slidesgenbench.prompts import build_quiz_source_context
 from tests.reward.quizbank_test_utils import (
     build_valid_quizbank_stage_responses,
     make_quizbank_service,

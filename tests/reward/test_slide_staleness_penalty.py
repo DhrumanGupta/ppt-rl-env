@@ -2,15 +2,15 @@ from __future__ import annotations
 
 from unittest.mock import patch
 
-from server.utils.pptx_extraction import PptxExtractionService
-from server.utils.pptx_functions import PptxEditor
-from server.utils.presentbench.metrics import compute_slide_staleness_penalty
-from server.utils.reward_kernel import (
+from ppt_agent.server.utils.pptx_extraction import PptxExtractionService
+from ppt_agent.server.utils.pptx_functions import PptxEditor
+from ppt_agent.server.utils.presentbench.metrics import compute_slide_staleness_penalty
+from ppt_agent.server.utils.reward_kernel import (
     build_eval_spec,
     evaluate_presentation,
     evaluate_slide,
 )
-from server.utils.reward_models import SourceDocument, SourcePack
+from ppt_agent.server.utils.reward_models import SourceDocument, SourcePack
 
 
 class EmptyQuizBankService:

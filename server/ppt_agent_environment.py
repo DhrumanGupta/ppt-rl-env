@@ -30,6 +30,7 @@ from .utils.reward_kernel import (
     evaluate_presentation,
     evaluate_slide,
 )
+from .utils.reward_metrics import clamp_reward
 from .utils.reward_models import EvalSpec, ExtractedPresentation, to_serializable
 from .utils.slidesgenbench import (
     QuantitativeQuizJudgeService,
@@ -232,10 +233,13 @@ class PptAgentEnvironment(Environment):
                         slide_index=execution_result.affected_slide_index,
                         inspection=inspection,
                     )
-                    reward = intermediate_result.reward_total
+                    reward = clamp_reward(intermediate_result.reward_total)
                     self._last_reward_details = {
                         "kind": "intermediate_slide",
-                        "result": to_serializable(intermediate_result),
+                        "result": {
+                            **to_serializable(intermediate_result),
+                            "reward_total": reward,
+                        },
                     }
                     write_debug_event(
                         "reward.intermediate",
@@ -245,7 +249,7 @@ class PptAgentEnvironment(Environment):
                         },
                     )
                 else:
-                    reward = execution_result.reward
+                    reward = clamp_reward(execution_result.reward)
                     self._last_reward_details = {
                         "kind": "action",
                         "result": {"reward_total": reward},
@@ -267,7 +271,7 @@ class PptAgentEnvironment(Environment):
                 )
             except (IndexError, KeyError, ValueError) as error:
                 invalid_reason = str(error)
-                reward = _INVALID_ACTION_PENALTY
+                reward = clamp_reward(_INVALID_ACTION_PENALTY)
                 self._last_action_result = None
                 self._last_reward_details = {
                     "kind": "invalid_action",
@@ -291,7 +295,7 @@ class PptAgentEnvironment(Environment):
                 )
 
             termination_reason = self._should_terminate()
-            reward = max(0.0, min(1.0, float(reward)))
+            reward = clamp_reward(float(reward))
 
             if termination_reason is not None:
                 reward = self._finalize_episode(termination_reason)

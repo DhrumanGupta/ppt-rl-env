@@ -2,10 +2,12 @@ from __future__ import annotations
 
 import copy
 
-from server.utils.reward_metrics import deck_text_corpus
-from server.utils.reward_models import ExtractedPresentation, QuizQuestion
-from server.utils.slidesgenbench.quizbank_service import SlidesGenQuizBankService
-from server.utils.slidesgenbench.quantitative_judge import (
+from ppt_agent.server.utils.reward_metrics import deck_text_corpus
+from ppt_agent.server.utils.reward_models import ExtractedPresentation, QuizQuestion
+from ppt_agent.server.utils.slidesgenbench.quizbank_service import (
+    SlidesGenQuizBankService,
+)
+from ppt_agent.server.utils.slidesgenbench.quantitative_judge import (
     SlidesGenQuantitativeJudgeService,
 )
 

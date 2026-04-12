@@ -1,4 +1,4 @@
-from client import PptAgentEnv
+from ppt_agent.client import PptAgentEnv
 
 
 def test_client_preserves_observation_metadata() -> None:

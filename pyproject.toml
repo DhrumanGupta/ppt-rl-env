@@ -66,6 +66,9 @@ packages = [
 "ppt_agent.server.utils.presentbench" = "server/utils/presentbench"
 "ppt_agent.server.utils.slidesgenbench" = "server/utils/slidesgenbench"
 
+[tool.setuptools.package-data]
+"ppt_agent.server" = ["data.json"]
+
 [dependency-groups]
 dev = [
     "pytest>=9.0.2",

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
+from ..reward_metrics import clamp_reward
 from ..reward_metrics import slide_text_corpus, text_match_score
-from ..reward_metrics import clamp
 from ..reward_models import (
     ExtractedPresentation,
     RenderedPresentation,
@@ -116,7 +116,7 @@ def score_slidesgenbench(
         + branch_split.get("aesthetics", 0.35) * s_aesthetic
         + branch_split.get("text_layout", 0.30) * s_text_layout
     )
-    reward_total = clamp(reward_pre_cap * text_layout_hard_cap)
+    reward_total = clamp_reward(reward_pre_cap * text_layout_hard_cap)
     return SlidesGenBenchScoreResult(
         reward_total=reward_total,
         reward_breakdown={

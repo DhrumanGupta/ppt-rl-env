@@ -13,7 +13,7 @@ from .metrics import (
     score_slide_checklist_item,
 )
 from ..reward_metrics import (
-    clamp,
+    clamp_reward,
     compute_overlap_ratio,
     is_blank_or_title_only,
 )
@@ -94,7 +94,7 @@ def score_presentbench(
     }
     p_soft = sum(soft_penalties.values())
     aesthetic_weight = eval_spec.scoring_config.get("aesthetic_weight", 0.15)
-    reward_total = clamp(
+    reward_total = clamp_reward(
         c_hard
         * (
             (1.0 - aesthetic_weight) * r_pb
@@ -217,7 +217,7 @@ def score_presentbench_slide(
         "staleness": penalty_config["staleness"] * float(staleness["penalty"]),
     }
     p_slide_soft = sum(soft_penalties.values())
-    reward_total = clamp(
+    reward_total = clamp_reward(
         c_slide_hard
         * (
             0.35 * s_prompt_alignment

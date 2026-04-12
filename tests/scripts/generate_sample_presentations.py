@@ -5,7 +5,7 @@ ROOT = Path(__file__).resolve().parents[2]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from server.tools.pptx_tools import (
+from ppt_agent.server.tools.pptx_tools import (
     create_presentation,
     create_slide,
     register_theme,

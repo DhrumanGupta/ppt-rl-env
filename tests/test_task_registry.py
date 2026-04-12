@@ -1,4 +1,4 @@
-from server.task_registry import DEFAULT_TASK_REGISTRY, DEFAULT_THEME
+from ppt_agent.server.task_registry import DEFAULT_TASK_REGISTRY, DEFAULT_THEME
 
 
 def test_default_registry_injects_default_theme_and_difficulty() -> None:
