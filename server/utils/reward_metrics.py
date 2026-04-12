@@ -14,7 +14,7 @@ _NUMBER_PATTERN = re.compile(r"\b\d+(?:\.\d+)?%?\b")
 _TEXT_UNIT_SPLIT_PATTERN = re.compile(r"(?<=[.!?])\s+|\n+")
 _DEFAULT_SENTENCE_MODEL = os.environ.get(
     "SENTENCE_TRANSFORMER_MODEL",
-    "sentence-transformers/all-MiniLM-L6-v2",
+    "all-mpnet-base-v2",
 )
 
 
