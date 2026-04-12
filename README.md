@@ -35,7 +35,7 @@ The repository is structured to match the benchmark contract:
 Start the environment locally:
 
 ```bash
-uv run --env-file .env uvicorn server.app:app --host 0.0.0.0 --port 7860
+uv run --env-file .env uvicorn ppt_agent.server.app:app --host 0.0.0.0 --port 7860
 ```
 
 Run the baseline inference script against the local environment:
@@ -101,7 +101,7 @@ openenv push --repo-id my-org/my-env
 openenv push --private
 ```
 
-The Space URL will be the ping target for `scripts/validate-submission.sh`.
+The Space URL will be the ping target for `validate-submission.sh`.
 
 ## Environment Details
 
@@ -137,7 +137,7 @@ Intermediate steps receive bounded slide-level reward. Finalization evaluates th
 
 ## Tasks
 
-The environment currently ships with 6 scenarios in `server/data.json`:
+The environment currently ships with 6 scenarios in `ppt_agent/server/data.json`:
 
 - 2 easy
 - 2 medium
@@ -157,8 +157,8 @@ Each task includes:
 Connect the client directly to a running environment:
 
 ```python
-from client import PptAgentEnv
-from models import PptAgentAction
+from ppt_agent.client import PptAgentEnv
+from ppt_agent.models import PptAgentAction
 
 env = PptAgentEnv(base_url="http://localhost:7860")
 
@@ -175,7 +175,7 @@ Run the built-in checks before submission:
 ```bash
 openenv validate
 docker build .
-./scripts/validate-submission.sh https://your-space.hf.space .
+./validate-submission.sh https://your-space.hf.space .
 ```
 
 The validator checks:
@@ -189,7 +189,7 @@ The validator checks:
 Start the server:
 
 ```bash
-uv run --env-file .env uvicorn server.app:app --host 0.0.0.0 --port 7860
+uv run --env-file .env uvicorn ppt_agent.server.app:app --host 0.0.0.0 --port 7860
 ```
 
 Run inference against it:
@@ -203,18 +203,22 @@ You can set `TASK_DIFFICULTY=easy|medium|hard` to control which scenario bucket 
 ## Project Structure
 
 ```
-ppt_agent/
-├── .dockerignore         # Docker build exclusions
-├── __init__.py            # Module exports
-├── README.md              # This file
-├── openenv.yaml           # OpenEnv manifest
-├── pyproject.toml         # Project metadata and dependencies
-├── uv.lock                # Locked dependencies (generated)
-├── client.py              # PptAgentEnv client
-├── models.py              # Action and Observation models
-└── server/
-    ├── __init__.py        # Server module exports
-    ├── ppt_agent_environment.py  # Core environment logic
-    ├── app.py             # FastAPI application (HTTP + WebSocket endpoints)
-    └── Dockerfile         # Container image definition
+.
+├── inference.py          # Thin root wrapper for benchmark execution
+├── inference_debug.py    # Thin root wrapper for debug execution
+├── openenv.yaml          # OpenEnv manifest
+├── pyproject.toml        # Project metadata and dependencies
+├── README.md             # This file
+└── ppt_agent/
+    ├── __init__.py       # Package exports
+    ├── agent_action_tools.py
+    ├── client.py         # PptAgentEnv client
+    ├── inference.py      # Package inference implementation
+    ├── inference_debug.py
+    ├── models.py         # Action and Observation models
+    └── server/
+        ├── __init__.py
+        ├── app.py        # FastAPI application
+        ├── data.json     # Task scenarios
+        └── ppt_agent_environment.py
 ```

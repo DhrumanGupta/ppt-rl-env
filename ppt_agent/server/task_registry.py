@@ -87,7 +87,9 @@ def _load_raw_scenarios() -> list[dict[str, Any]]:
     payload = json.loads(_DATA_PATH.read_text(encoding="utf-8"))
     scenarios = payload.get("scenarios")
     if not isinstance(scenarios, list) or not scenarios:
-        raise ValueError("server/data.json must contain a non-empty 'scenarios' list")
+        raise ValueError(
+            "ppt_agent/server/data.json must contain a non-empty 'scenarios' list"
+        )
     return scenarios
 
 

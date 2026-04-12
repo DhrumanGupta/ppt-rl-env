@@ -45,9 +45,28 @@ def _similarity_units(text: str | None) -> list[str]:
 
 @lru_cache(maxsize=1)
 def _similarity_model():
-    from sentence_transformers import SentenceTransformer
+    import io
+    import logging
+    import sys
 
-    return SentenceTransformer(_DEFAULT_SENTENCE_MODEL)
+    _noisy_loggers = ("sentence_transformers", "transformers", "huggingface_hub")
+    prev_levels = {name: logging.getLogger(name).level for name in _noisy_loggers}
+    for name in _noisy_loggers:
+        logging.getLogger(name).setLevel(logging.ERROR)
+
+    os.environ["HF_HUB_DISABLE_PROGRESS_BARS"] = "1"
+    prev_stderr = sys.stderr
+    sys.stderr = io.StringIO()
+
+    try:
+        from sentence_transformers import SentenceTransformer
+
+        return SentenceTransformer(_DEFAULT_SENTENCE_MODEL)
+    finally:
+        sys.stderr = prev_stderr
+        os.environ.pop("HF_HUB_DISABLE_PROGRESS_BARS", None)
+        for name, lvl in prev_levels.items():
+            logging.getLogger(name).setLevel(lvl)
 
 
 def preload_similarity_model() -> None:

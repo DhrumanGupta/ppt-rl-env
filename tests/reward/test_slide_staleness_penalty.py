@@ -199,7 +199,9 @@ def test_staleness_penalty_reduces_intermediate_and_terminal_rewards() -> None:
     stale_editor = _make_stale_tinted_editor()
     designed_editor = _make_designed_editor()
 
-    with patch("server.utils.presentbench.metrics.text_match_score", _local_match):
+    with patch(
+        "ppt_agent.server.utils.presentbench.metrics.text_match_score", _local_match
+    ):
         stale_slide = extractor.inspect_presentation(stale_editor).slides[0]
         designed_slide = extractor.inspect_presentation(designed_editor).slides[0]
         stale_intermediate = evaluate_slide(eval_spec, 1, slide_extraction=stale_slide)

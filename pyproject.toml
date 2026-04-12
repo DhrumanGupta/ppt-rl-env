@@ -17,7 +17,7 @@ dependencies = [
     # Core OpenEnv runtime (provides FastAPI server + HTTP client types)
     # install from github
     # "openenv-core[core] @ git+https://github.com/meta-pytorch/OpenEnv.git",
-    "openenv-core[core]>=0.2.1",
+    "openenv-core[core]>=0.2.0",
     # Environment-specific dependencies
     # Add all dependencies needed for your environment here
     # Examples:
@@ -47,24 +47,10 @@ server = "ppt_agent.server.app:main"
 
 [tool.setuptools]
 include-package-data = true
-packages = [
-    "ppt_agent",
-    "ppt_agent.server",
-    "ppt_agent.server.tools",
-    "ppt_agent.server.utils",
-    "ppt_agent.server.utils.rendering",
-    "ppt_agent.server.utils.presentbench",
-    "ppt_agent.server.utils.slidesgenbench",
-]
 
-[tool.setuptools.package-dir]
-"ppt_agent" = "."
-"ppt_agent.server" = "server"
-"ppt_agent.server.tools" = "server/tools"
-"ppt_agent.server.utils" = "server/utils"
-"ppt_agent.server.utils.rendering" = "server/utils/rendering"
-"ppt_agent.server.utils.presentbench" = "server/utils/presentbench"
-"ppt_agent.server.utils.slidesgenbench" = "server/utils/slidesgenbench"
+[tool.setuptools.packages.find]
+include = ["ppt_agent*"]
+exclude = ["build*", "tests*"]
 
 [tool.setuptools.package-data]
 "ppt_agent.server" = ["data.json"]

@@ -6,13 +6,7 @@ from typing import Annotated, Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
-try:
-    from models import PptAgentAction
-except ImportError:
-    try:
-        from ppt_agent.models import PptAgentAction
-    except ImportError:
-        from .models import PptAgentAction
+from .models import PptAgentAction
 
 
 class _StrictModel(BaseModel):
@@ -253,6 +247,7 @@ _SHAPE_SCHEMA = {
         },
         "img": {"type": "string"},
         "hex": {"type": "string"},
+        "color_hex": {"type": "string"},
         "height": {"type": "number"},
         "x": {"type": "number"},
         "y": {"type": "number"},
@@ -552,12 +547,14 @@ def _normalize_shape(shape: Any) -> Any:
     raw_style = canonical_shape.get("style")
     style_payload = raw_style if isinstance(raw_style, dict) else {}
 
-    if shape_type == "accent_bar" and "color_hex" not in canonical_shape:
+    if shape_type == "accent_bar" and not canonical_shape.get("color_hex"):
         if (
             isinstance(style_payload.get("color_hex"), str)
             and style_payload["color_hex"]
         ):
             canonical_shape["color_hex"] = style_payload["color_hex"]
+        elif "shape_id" not in canonical_shape:
+            canonical_shape["color_hex"] = "<accent>"
 
     for key, value in canonical_shape.items():
         if key == "style":

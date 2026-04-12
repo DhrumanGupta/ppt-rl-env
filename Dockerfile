@@ -16,8 +16,8 @@ RUN --mount=type=cache,target=/root/.cache/uv \
         uv sync --no-install-project --no-dev; \
     fi
 
-COPY __init__.py agent_action_tools.py client.py inference.py inference_debug.py models.py README.md LICENSE openenv.yaml /app/
-COPY server /app/server
+COPY inference.py inference_debug.py README.md LICENSE openenv.yaml /app/
+COPY ppt_agent /app/ppt_agent
 
 RUN --mount=type=cache,target=/root/.cache/uv \
     if [ -f uv.lock ]; then \
@@ -39,8 +39,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 ENV PYTHONUNBUFFERED=1
 
 COPY --from=builder /app/.venv /app/.venv
-COPY __init__.py agent_action_tools.py client.py inference.py inference_debug.py models.py LICENSE /app/
-COPY server /app/server
+COPY inference.py inference_debug.py LICENSE /app/
+COPY ppt_agent /app/ppt_agent
 COPY README.md openenv.yaml /app/
 
 ENV PATH="/app/.venv/bin:$PATH"

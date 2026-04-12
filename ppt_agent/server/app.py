@@ -19,13 +19,13 @@ Endpoints:
 
 Usage:
     # Development (with auto-reload):
-    uvicorn server.app:app --reload --host 0.0.0.0 --port 7860
+    uvicorn ppt_agent.server.app:app --reload --host 0.0.0.0 --port 7860
 
     # Production:
-    uvicorn server.app:app --host 0.0.0.0 --port 7860 --workers 4
+    uvicorn ppt_agent.server.app:app --host 0.0.0.0 --port 7860 --workers 4
 
     # Or run directly:
-    python -m server.app
+    python -m ppt_agent.server.app
 """
 
 from openenv.core.env_server.http_server import create_app
