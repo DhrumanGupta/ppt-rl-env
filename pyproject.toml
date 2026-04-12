@@ -47,8 +47,24 @@ server = "ppt_agent.server.app:main"
 
 [tool.setuptools]
 include-package-data = true
-packages = ["ppt_agent", "ppt_agent.server"]
-package-dir = { "ppt_agent" = ".", "ppt_agent.server" = "server" }
+packages = [
+    "ppt_agent",
+    "ppt_agent.server",
+    "ppt_agent.server.tools",
+    "ppt_agent.server.utils",
+    "ppt_agent.server.utils.rendering",
+    "ppt_agent.server.utils.presentbench",
+    "ppt_agent.server.utils.slidesgenbench",
+]
+
+[tool.setuptools.package-dir]
+"ppt_agent" = "."
+"ppt_agent.server" = "server"
+"ppt_agent.server.tools" = "server/tools"
+"ppt_agent.server.utils" = "server/utils"
+"ppt_agent.server.utils.rendering" = "server/utils/rendering"
+"ppt_agent.server.utils.presentbench" = "server/utils/presentbench"
+"ppt_agent.server.utils.slidesgenbench" = "server/utils/slidesgenbench"
 
 [dependency-groups]
 dev = [

@@ -10,8 +10,12 @@ try:
     from .client import PptAgentEnv
     from .models import PptAgentAction, PptAgentObservation
 except ImportError:  # pragma: no cover
-    from client import PptAgentEnv
-    from models import PptAgentAction, PptAgentObservation
+    try:
+        from client import PptAgentEnv
+        from models import PptAgentAction, PptAgentObservation
+    except ImportError:
+        from ppt_agent.client import PptAgentEnv
+        from ppt_agent.models import PptAgentAction, PptAgentObservation
 
 __all__ = [
     "PptAgentAction",
