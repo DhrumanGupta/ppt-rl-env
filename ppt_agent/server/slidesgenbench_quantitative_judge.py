@@ -2,11 +2,11 @@ from __future__ import annotations
 
 from typing import Any, Protocol
 
-from ...llm_client import LLMClient
-from .prompts import (
+from .llm_client import LLMClient
+from .slidesgenbench_prompts import (
     build_quantitative_quiz_judging_prompts,
 )
-from ..reward_models import (
+from .reward_models import (
     ExtractedPresentation,
     QuizQuestion,
     TaskSpec,

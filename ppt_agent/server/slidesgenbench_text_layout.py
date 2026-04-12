@@ -4,8 +4,8 @@ from typing import Any
 
 import numpy as np
 
-from ..reward_metrics import clamp
-from ..reward_models import (
+from .reward_metrics import clamp
+from .reward_models import (
     ExtractedPresentation,
     ExtractedShape,
     ExtractedSlide,

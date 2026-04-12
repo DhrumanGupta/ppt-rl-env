@@ -14,7 +14,7 @@ from ..models import PptAgentAction, PptAgentObservation
 from .debug_logging import debug_context, write_debug_event
 from .llm_client import LLMClient
 from .task_registry import DEFAULT_TASK_REGISTRY, TaskRegistry, TaskScenario
-from .tools.pptx_tools import (
+from .pptx_tools import (
     create_slide,
     delete_slide,
     register_theme,
@@ -22,20 +22,18 @@ from .tools.pptx_tools import (
     update_slide,
     update_theme,
 )
-from .utils.pptx_extraction import PptxExtractionService
-from .utils.pptx_functions import PptxEditor
-from .utils.rendering.pptx_render_service import PptxRenderService
-from .utils.reward_kernel import (
-    build_eval_spec,
-    evaluate_presentation,
-    evaluate_slide,
-)
-from .utils.reward_metrics import clamp_reward
-from .utils.reward_models import EvalSpec, ExtractedPresentation, to_serializable
-from .utils.slidesgenbench import (
+from .pptx_extraction import PptxExtractionService
+from .pptx_functions import PptxEditor
+from .pptx_render_service import PptxRenderService
+from .reward_kernel import build_eval_spec, evaluate_presentation, evaluate_slide
+from .reward_metrics import clamp_reward
+from .reward_models import EvalSpec, ExtractedPresentation, to_serializable
+from .slidesgenbench_quantitative_judge import (
     QuantitativeQuizJudgeService,
-    QuizBankGenerationService,
     SlidesGenQuantitativeJudgeService,
+)
+from .slidesgenbench_quizbank_service import (
+    QuizBankGenerationService,
     SlidesGenQuizBankService,
 )
 
@@ -708,37 +706,3 @@ class PptAgentEnvironment(Environment):
             result.metadata,
         )
         return self._last_score
-
-
-if __name__ == "__main__":  # pragma: no cover
-    env = PptAgentEnvironment()
-    observation = env.reset(seed=7)
-    print("Reset prompt:", observation.prompt_summary)
-    observation = env.step(PptAgentAction(action_type="create_slide"))
-    print("Slides after create_slide:", observation.slide_count)
-    observation = env.step(
-        PptAgentAction(
-            action_type="update_slide",
-            slide_index=1,
-            payload={
-                "add_shapes": [
-                    {
-                        "type": "text",
-                        "text": "Hello from the PPT skeleton",
-                        "x": 0.8,
-                        "y": 1.2,
-                        "w": 8.4,
-                        "h": 1.0,
-                        "style": {
-                            "font_name": "<font>",
-                            "font_size_pt": "<body_size>",
-                            "color_hex": "<primary>",
-                        },
-                    }
-                ]
-            },
-        )
-    )
-    while not observation.done:
-        observation = env.step(PptAgentAction(action_type="create_slide"))
-    print("Terminal reward:", observation.reward)

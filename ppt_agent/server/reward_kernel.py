@@ -8,11 +8,11 @@ from typing import Any
 from pptx.presentation import Presentation as PptxPresentation
 
 from .pptx_functions import PptxEditor
-from .presentbench.scoring import (
+from .presentbench_scoring import (
     score_presentbench,
     score_presentbench_slide,
 )
-from .presentbench.spec_builder import build_presentbench_eval_spec
+from .presentbench_spec_builder import build_presentbench_eval_spec
 from .pptx_extraction import PptxExtractionService
 from .reward_metrics import clamp_reward
 from .reward_models import (
@@ -25,16 +25,16 @@ from .reward_models import (
     to_serializable,
 )
 from .reward_prompts import build_task_spec
-from .slidesgenbench.quizbank_service import QuizBankGenerationService
-from .slidesgenbench.quantitative_judge import (
+from .slidesgenbench_quizbank_service import QuizBankGenerationService
+from .slidesgenbench_quantitative_judge import (
     QuantitativeQuizJudgeService,
 )
-from .slidesgenbench.scoring import score_slidesgenbench
-from .slidesgenbench.spec_builder import build_slidesgenbench_eval_spec
-from .slidesgenbench.rendered_aesthetics import (
+from .slidesgenbench_scoring import score_slidesgenbench
+from .slidesgenbench_spec_builder import build_slidesgenbench_eval_spec
+from .slidesgenbench_rendered_aesthetics import (
     compute_intermediate_rendered_aesthetics_score,
 )
-from .slidesgenbench.text_layout import compute_slide_text_layout_scores
+from .slidesgenbench_text_layout import compute_slide_text_layout_scores
 
 SPEC_VERSION = "1.0"
 INTERMEDIATE_SLIDESGENBENCH_AESTHETIC_WEIGHT = 0.20

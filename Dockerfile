@@ -6,6 +6,7 @@ WORKDIR /app
 
 ENV PYTHONUNBUFFERED=1
 ENV UV_LINK_MODE=copy
+ENV UV_HTTP_TIMEOUT=120
 
 COPY pyproject.toml uv.lock /app/
 

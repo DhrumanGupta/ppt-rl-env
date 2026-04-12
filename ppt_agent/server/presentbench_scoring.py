@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from .metrics import (
+from .presentbench_metrics import (
     compute_aesthetics_scores,
     compute_presentation_diagnostics,
     compute_slide_staleness_penalty,
@@ -12,12 +12,12 @@ from .metrics import (
     score_generic_slide_checklist_items,
     score_slide_checklist_item,
 )
-from ..reward_metrics import (
+from .reward_metrics import (
     clamp_reward,
     compute_overlap_ratio,
     is_blank_or_title_only,
 )
-from ..reward_models import (
+from .reward_models import (
     IntermediateSlideRewardResult,
     PresentBenchEvalSpec,
     PresentBenchScoreResult,

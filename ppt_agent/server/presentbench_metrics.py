@@ -4,7 +4,7 @@ from collections import defaultdict
 from statistics import median
 from typing import Any
 
-from ..reward_metrics import (
+from .reward_metrics import (
     clamp,
     compute_overlap_ratio,
     deck_text_corpus,
@@ -14,7 +14,7 @@ from ..reward_metrics import (
     slide_text_corpus,
     text_match_score,
 )
-from ..reward_models import (
+from .reward_models import (
     ChecklistItem,
     ExtractedPresentation,
     ExtractedShape,

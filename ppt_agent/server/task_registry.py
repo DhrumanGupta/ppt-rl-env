@@ -1,12 +1,11 @@
 from __future__ import annotations
 
-import json
 import random
 from dataclasses import dataclass
-from pathlib import Path
 from typing import Any, Iterable
 
-from .utils.reward_models import SourceDocument, SourcePack, TaskConstraints
+from .data import DATA
+from .reward_models import SourceDocument, SourcePack, TaskConstraints
 
 DEFAULT_THEME = {
     "bg": "#F8FAFC",
@@ -19,8 +18,6 @@ DEFAULT_THEME = {
     "body_size": 16,
     "caption_size": 10,
 }
-
-_DATA_PATH = Path(__file__).with_name("data.json")
 
 
 @dataclass(frozen=True, slots=True)
@@ -84,11 +81,10 @@ class TaskRegistry:
 
 
 def _load_raw_scenarios() -> list[dict[str, Any]]:
-    payload = json.loads(_DATA_PATH.read_text(encoding="utf-8"))
-    scenarios = payload.get("scenarios")
+    scenarios = DATA.get("scenarios")
     if not isinstance(scenarios, list) or not scenarios:
         raise ValueError(
-            "ppt_agent/server/data.json must contain a non-empty 'scenarios' list"
+            "ppt_agent.server.data.DATA must contain a non-empty 'scenarios' list"
         )
     return scenarios
 

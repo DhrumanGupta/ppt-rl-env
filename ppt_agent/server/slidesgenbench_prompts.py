@@ -3,8 +3,8 @@ from __future__ import annotations
 import json
 import re
 
-from ..reward_metrics import slide_text_corpus
-from ..reward_models import (
+from .reward_metrics import slide_text_corpus
+from .reward_models import (
     ExtractedPresentation,
     QuizEvidenceBundle,
     QuizQuestion,
