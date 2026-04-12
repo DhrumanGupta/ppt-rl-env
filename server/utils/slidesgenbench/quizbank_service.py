@@ -5,9 +5,9 @@ import logging
 import re
 from typing import Any, Protocol
 
-from server.debug_logging import write_debug_event
-from server.llm_client import LLMClient
-from server.utils.reward_models import (
+from ...debug_logging import write_debug_event
+from ...llm_client import LLMClient
+from ..reward_models import (
     QuizEvidence,
     QuizEvidenceBundle,
     QuizQuestion,
@@ -15,7 +15,7 @@ from server.utils.reward_models import (
     TaskSpec,
     to_serializable,
 )
-from server.utils.slidesgenbench.prompts import (
+from .prompts import (
     build_quiz_extraction_prompts,
     build_quiz_generation_prompts,
     build_quiz_refinement_prompts,

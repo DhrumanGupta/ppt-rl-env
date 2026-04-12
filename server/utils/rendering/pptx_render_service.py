@@ -11,9 +11,9 @@ from typing import Any
 from PIL import Image
 from pptx.presentation import Presentation as PptxPresentation
 
-from server.utils.pptx_extraction import open_presentation, presentation_digest
-from server.utils.pptx_functions import PptxEditor
-from server.utils.reward_models import RenderedPresentation, RenderedSlideImage
+from ..pptx_extraction import open_presentation, presentation_digest
+from ..pptx_functions import PptxEditor
+from ..reward_models import RenderedPresentation, RenderedSlideImage
 
 
 class PptxRenderService:

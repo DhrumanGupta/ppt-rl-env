@@ -3,13 +3,13 @@ from __future__ import annotations
 import hashlib
 import json
 
-from server.utils.reward_models import (
+from ..reward_models import (
     SlidesGenBenchEvalSpec,
     SourcePack,
     TaskSpec,
     to_serializable,
 )
-from server.utils.slidesgenbench.quizbank_service import QuizBankGenerationService
+from .quizbank_service import QuizBankGenerationService
 
 SPEC_VERSION = "1.0"
 

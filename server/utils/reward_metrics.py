@@ -7,7 +7,7 @@ from typing import Any
 
 import numpy as np
 
-from server.utils.reward_models import ExtractedPresentation, ExtractedSlide
+from .reward_models import ExtractedPresentation, ExtractedSlide
 
 
 _NUMBER_PATTERN = re.compile(r"\b\d+(?:\.\d+)?%?\b")

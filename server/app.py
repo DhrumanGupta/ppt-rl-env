@@ -30,14 +30,9 @@ Usage:
 
 from openenv.core.env_server.http_server import create_app
 
-try:
-    from ..models import PptAgentAction, PptAgentObservation
-    from .ppt_agent_environment import PptAgentEnvironment
-    from .utils.reward_metrics import preload_similarity_model
-except ImportError:
-    from models import PptAgentAction, PptAgentObservation
-    from server.ppt_agent_environment import PptAgentEnvironment
-    from server.utils.reward_metrics import preload_similarity_model
+from ..models import PptAgentAction, PptAgentObservation
+from .ppt_agent_environment import PptAgentEnvironment
+from .utils.reward_metrics import preload_similarity_model
 
 
 # Create the app with web interface and README integration

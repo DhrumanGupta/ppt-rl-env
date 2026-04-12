@@ -10,8 +10,8 @@ from pptx import Presentation as load_presentation
 from pptx.enum.dml import MSO_FILL
 from pptx.presentation import Presentation as PptxPresentation
 
-from server.utils.pptx_functions import PptxEditor
-from server.utils.reward_models import (
+from .pptx_functions import PptxEditor
+from .reward_models import (
     ExtractedChart,
     ExtractedImage,
     ExtractedPresentation,

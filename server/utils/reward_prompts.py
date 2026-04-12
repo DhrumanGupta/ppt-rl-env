@@ -6,7 +6,7 @@ import re
 from dataclasses import dataclass
 from typing import Any
 
-from server.utils.reward_models import (
+from .reward_models import (
     RequiredSlideSpec,
     SourcePack,
     TaskConstraints,

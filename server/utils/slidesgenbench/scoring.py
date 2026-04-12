@@ -1,19 +1,19 @@
 from __future__ import annotations
 
-from server.utils.reward_metrics import slide_text_corpus, text_match_score
-from server.utils.reward_metrics import clamp
-from server.utils.reward_models import (
+from ..reward_metrics import slide_text_corpus, text_match_score
+from ..reward_metrics import clamp
+from ..reward_models import (
     ExtractedPresentation,
     RenderedPresentation,
     SlidesGenBenchEvalSpec,
     SlidesGenBenchScoreResult,
     TaskSpec,
 )
-from server.utils.slidesgenbench.quantitative_judge import QuantitativeQuizJudgeService
-from server.utils.slidesgenbench.rendered_aesthetics import (
+from .quantitative_judge import QuantitativeQuizJudgeService
+from .rendered_aesthetics import (
     compute_rendered_aesthetics_scores,
 )
-from server.utils.slidesgenbench.text_layout import (
+from .text_layout import (
     compute_presentation_text_layout_scores,
 )
 

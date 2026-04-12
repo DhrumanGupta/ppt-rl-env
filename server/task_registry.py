@@ -6,10 +6,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Iterable
 
-try:
-    from .utils.reward_models import SourceDocument, SourcePack, TaskConstraints
-except ImportError:
-    from server.utils.reward_models import SourceDocument, SourcePack, TaskConstraints
+from .utils.reward_models import SourceDocument, SourcePack, TaskConstraints
 
 DEFAULT_THEME = {
     "bg": "#F8FAFC",

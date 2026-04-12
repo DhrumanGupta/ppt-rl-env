@@ -6,8 +6,8 @@ from typing import Any
 import numpy as np
 from PIL import Image
 
-from server.utils.reward_metrics import clamp, compute_overlap_ratio
-from server.utils.reward_models import (
+from ..reward_metrics import clamp, compute_overlap_ratio
+from ..reward_models import (
     ExtractedPresentation,
     ExtractedSlide,
     RenderedPresentation,

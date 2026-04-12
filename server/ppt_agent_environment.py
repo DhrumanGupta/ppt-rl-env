@@ -10,66 +10,33 @@ from uuid import uuid4
 from openenv.core.env_server.interfaces import Environment
 from openenv.core.env_server.types import State
 
-try:
-    from ..models import PptAgentAction, PptAgentObservation
-    from .debug_logging import debug_context, write_debug_event
-    from .llm_client import LLMClient
-    from .task_registry import DEFAULT_TASK_REGISTRY, TaskRegistry, TaskScenario
-    from .tools.pptx_tools import (
-        create_slide,
-        delete_slide,
-        register_theme,
-        save_presentation,
-        update_slide,
-        update_theme,
-    )
-    from .utils.pptx_extraction import PptxExtractionService
-    from .utils.pptx_functions import PptxEditor
-    from .utils.rendering.pptx_render_service import PptxRenderService
-    from .utils.reward_kernel import (
-        build_eval_spec,
-        evaluate_presentation,
-        evaluate_slide,
-    )
-    from .utils.reward_models import EvalSpec, ExtractedPresentation, to_serializable
-    from .utils.slidesgenbench import (
-        QuantitativeQuizJudgeService,
-        QuizBankGenerationService,
-        SlidesGenQuantitativeJudgeService,
-        SlidesGenQuizBankService,
-    )
-except ImportError:
-    from models import PptAgentAction, PptAgentObservation
-    from server.debug_logging import debug_context, write_debug_event
-    from server.llm_client import LLMClient
-    from server.task_registry import DEFAULT_TASK_REGISTRY, TaskRegistry, TaskScenario
-    from server.tools.pptx_tools import (
-        create_slide,
-        delete_slide,
-        register_theme,
-        save_presentation,
-        update_slide,
-        update_theme,
-    )
-    from server.utils.pptx_extraction import PptxExtractionService
-    from server.utils.pptx_functions import PptxEditor
-    from server.utils.rendering.pptx_render_service import PptxRenderService
-    from server.utils.reward_kernel import (
-        build_eval_spec,
-        evaluate_presentation,
-        evaluate_slide,
-    )
-    from server.utils.reward_models import (
-        EvalSpec,
-        ExtractedPresentation,
-        to_serializable,
-    )
-    from server.utils.slidesgenbench import (
-        QuantitativeQuizJudgeService,
-        QuizBankGenerationService,
-        SlidesGenQuantitativeJudgeService,
-        SlidesGenQuizBankService,
-    )
+from ..models import PptAgentAction, PptAgentObservation
+from .debug_logging import debug_context, write_debug_event
+from .llm_client import LLMClient
+from .task_registry import DEFAULT_TASK_REGISTRY, TaskRegistry, TaskScenario
+from .tools.pptx_tools import (
+    create_slide,
+    delete_slide,
+    register_theme,
+    save_presentation,
+    update_slide,
+    update_theme,
+)
+from .utils.pptx_extraction import PptxExtractionService
+from .utils.pptx_functions import PptxEditor
+from .utils.rendering.pptx_render_service import PptxRenderService
+from .utils.reward_kernel import (
+    build_eval_spec,
+    evaluate_presentation,
+    evaluate_slide,
+)
+from .utils.reward_models import EvalSpec, ExtractedPresentation, to_serializable
+from .utils.slidesgenbench import (
+    QuantitativeQuizJudgeService,
+    QuizBankGenerationService,
+    SlidesGenQuantitativeJudgeService,
+    SlidesGenQuizBankService,
+)
 
 _DEFAULT_MAX_STEPS = 30
 _INVALID_ACTION_PENALTY = 0.0

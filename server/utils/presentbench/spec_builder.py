@@ -3,7 +3,7 @@ from __future__ import annotations
 import hashlib
 import json
 
-from server.utils.reward_models import (
+from ..reward_models import (
     ChecklistItem,
     PresentBenchEvalSpec,
     TaskSpec,
