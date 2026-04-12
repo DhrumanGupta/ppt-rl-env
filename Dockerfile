@@ -7,7 +7,17 @@ WORKDIR /app
 ENV PYTHONUNBUFFERED=1
 ENV UV_LINK_MODE=copy
 
-COPY . /app
+COPY pyproject.toml uv.lock /app/
+
+RUN --mount=type=cache,target=/root/.cache/uv \
+    if [ -f uv.lock ]; then \
+        uv sync --frozen --no-install-project --no-dev; \
+    else \
+        uv sync --no-install-project --no-dev; \
+    fi
+
+COPY __init__.py agent_action_tools.py client.py inference.py inference_debug.py models.py README.md LICENSE openenv.yaml /app/
+COPY server /app/server
 
 RUN --mount=type=cache,target=/root/.cache/uv \
     if [ -f uv.lock ]; then \
@@ -28,10 +38,13 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 ENV PYTHONUNBUFFERED=1
 
-COPY --from=builder /app /app
+COPY --from=builder /app/.venv /app/.venv
+COPY __init__.py agent_action_tools.py client.py inference.py inference_debug.py models.py LICENSE /app/
+COPY server /app/server
+COPY README.md openenv.yaml /app/
 
 ENV PATH="/app/.venv/bin:$PATH"
-ENV PYTHONPATH="/app:$PYTHONPATH"
+ENV PYTHONPATH="/app"
 
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
     CMD curl -f http://localhost:7860/health || exit 1
