@@ -6,8 +6,8 @@
 
 """Ppt Agent Environment."""
 
-from .client_inside import PptAgentEnv
-from .models_inside import PptAgentAction, PptAgentObservation
+from .client import PptAgentEnv
+from .models import PptAgentAction, PptAgentObservation
 
 __all__ = [
     "PptAgentAction",

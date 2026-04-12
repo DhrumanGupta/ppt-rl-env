@@ -10,7 +10,7 @@ from uuid import uuid4
 from openenv.core.env_server.interfaces import Environment
 from openenv.core.env_server.types import State
 
-from ..models_inside import PptAgentAction, PptAgentObservation
+from ..models import PptAgentAction, PptAgentObservation
 from .debug_logging import debug_context, write_debug_event
 from .llm_client import LLMClient
 from .pptx_extraction import PptxExtractionService
