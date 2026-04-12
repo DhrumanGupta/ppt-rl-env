@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import asyncio
 import json
 import os
 import textwrap
@@ -15,8 +14,8 @@ try:
         parse_tool_invocation,
         tool_invocation_to_action,
     )
-    from client import PptAgentEnv
     from models import PptAgentAction
+    from server.ppt_agent_environment import PptAgentEnvironment
 except ImportError:
     try:
         from ppt_agent.agent_action_tools import (
@@ -25,8 +24,8 @@ except ImportError:
             parse_tool_invocation,
             tool_invocation_to_action,
         )
-        from ppt_agent.client import PptAgentEnv
         from ppt_agent.models import PptAgentAction
+        from ppt_agent.server.ppt_agent_environment import PptAgentEnvironment
     except ImportError:
         from .agent_action_tools import (
             AgentToolInvocation,
@@ -34,14 +33,13 @@ except ImportError:
             parse_tool_invocation,
             tool_invocation_to_action,
         )
-        from .client import PptAgentEnv
         from .models import PptAgentAction
+        from .server.ppt_agent_environment import PptAgentEnvironment
 
 HF_TOKEN = os.getenv("HF_TOKEN")
 
 API_BASE_URL = os.getenv("API_BASE_URL", "https://router.huggingface.co/v1")
 MODEL_NAME = os.getenv("MODEL_NAME", "Qwen/Qwen3.5-27B")
-ENV_BASE_URL = os.getenv("ENV_BASE_URL", "https://berlm-ppt-agent.hf.space/")
 TEMPERATURE = 0.0
 TASKS = [("easy", 10), ("medium", 15), ("hard", 20)]
 
@@ -403,8 +401,9 @@ def choose_action(
         pass
 
 
-async def run_task(difficulty: str, max_steps: int) -> None:
-    client = OpenAI(base_url=API_BASE_URL, api_key=HF_TOKEN)
+def run_task(
+    env: PptAgentEnvironment, client: OpenAI, difficulty: str, max_steps: int
+) -> None:
     rewards: list[float] = []
     history: list[dict[str, Any]] = []
     steps_taken = 0
@@ -413,51 +412,45 @@ async def run_task(difficulty: str, max_steps: int) -> None:
     started = False
 
     try:
-        async with PptAgentEnv(base_url=ENV_BASE_URL, message_timeout_s=180.0) as env:
-            result = await env.reset(difficulty=difficulty)
-            observation = result.observation
-            log_start(
-                task=difficulty,
-                env=BENCHMARK,
-                model=MODEL_NAME,
-            )
-            started = True
+        observation = env.reset(difficulty=difficulty)
+        log_start(
+            task=difficulty,
+            env=BENCHMARK,
+            model=MODEL_NAME,
+        )
+        started = True
 
-            for step in range(1, max_steps + 1):
-                if result.done:
-                    break
-                # choose_action performs a synchronous model request. Keep it off
-                # the event loop so websocket heartbeat traffic can still flow.
-                action, action_str, invocation = await asyncio.to_thread(
-                    choose_action,
-                    client,
-                    observation,
-                    history,
-                    max_steps,
-                )
-                result = await env.step(action)
-                observation = result.observation
-                reward = float(result.reward or 0.0)
-                rewards.append(reward)
-                history.append(_history_entry_from_tool_call(invocation, observation))
-                steps_taken = step
-                log_step(
-                    step=step,
-                    action=action_str,
-                    reward=reward,
-                    done=result.done,
-                    error=observation.last_action_error,
-                )
-                if result.done:
-                    break
-
-            success = bool(
-                started
-                and result.done
-                and not observation.last_action_error
-                and observation.score > 0.0
+        for step in range(1, max_steps + 1):
+            if observation.done:
+                break
+            action, action_str, invocation = choose_action(
+                client,
+                observation,
+                history,
+                max_steps,
             )
-            score = float(observation.score or 0.0)
+            observation = env.step(action)
+            reward = float(observation.reward or 0.0)
+            rewards.append(reward)
+            history.append(_history_entry_from_tool_call(invocation, observation))
+            steps_taken = step
+            log_step(
+                step=step,
+                action=action_str,
+                reward=reward,
+                done=observation.done,
+                error=observation.last_action_error,
+            )
+            if observation.done:
+                break
+
+        success = bool(
+            started
+            and observation.done
+            and not observation.last_action_error
+            and observation.score > 0.0
+        )
+        score = float(observation.score or 0.0)
 
     except Exception as error:
         success = False
@@ -465,10 +458,12 @@ async def run_task(difficulty: str, max_steps: int) -> None:
         log_end(success=success, steps=steps_taken, score=score, rewards=rewards)
 
 
-async def main() -> None:
+def main() -> None:
+    client = OpenAI(base_url=API_BASE_URL, api_key=HF_TOKEN)
+    env = PptAgentEnvironment()
     for difficulty, max_steps in TASKS:
-        await run_task(difficulty, max_steps)
+        run_task(env, client, difficulty, max_steps)
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    main()
